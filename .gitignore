@@ -57,3 +57,5 @@ app.*.map.json
 /superlistas.iml
 .metadata
 pubspec.lock
+# Ignora o arquivo de configuração do Firebase para Android
+/android/app/google-services.json
