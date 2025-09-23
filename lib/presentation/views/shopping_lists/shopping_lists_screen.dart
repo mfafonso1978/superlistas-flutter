@@ -4,107 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:superlistas/core/ui/widgets/currency_input_formatter.dart';
 import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
+import 'package:superlistas/core/ui/widgets/shared_widgets.dart'; // <<< IMPORT ATUALIZADO
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
 
 const double _kListsAppBarHeight = kToolbarHeight;
-
-void showAddOrEditListDialog(
-    BuildContext context,
-    WidgetRef ref, {
-      required String userId,
-      ShoppingList? list,
-    }) {
-  final isEditMode = list != null;
-  final nameController = TextEditingController(text: list?.name);
-
-  String initialBudgetText = '';
-  if (list != null && list.budget != null) {
-    initialBudgetText =
-        NumberFormat.currency(locale: 'pt_BR', symbol: '').format(list.budget);
-  }
-  final budgetController = TextEditingController(text: initialBudgetText);
-
-  showGlassDialog(
-    context: context,
-    title: Row(
-      children: [
-        Icon(
-          isEditMode ? Icons.edit_note_rounded : Icons.playlist_add_rounded,
-          color: Theme.of(context).colorScheme.secondary,
-        ),
-        const SizedBox(width: 12),
-        Text(isEditMode ? 'Editar Lista' : 'Nova Lista'),
-      ],
-    ),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome da Lista',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: budgetController,
-          decoration: const InputDecoration(
-            labelText: 'Orçamento (Opcional)',
-            prefixText: 'R\$ ',
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            CurrencyInputFormatter(),
-          ],
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Cancelar'),
-      ),
-      ElevatedButton(
-        onPressed: () {
-          if (nameController.text.isEmpty) return;
-          final budgetText =
-          budgetController.text.replaceAll('.', '').replaceAll(',', '.');
-          final budget = double.tryParse(budgetText);
-
-          if (isEditMode) {
-            ref
-                .read(shoppingListsViewModelProvider(userId).notifier)
-                .updateList(
-              list!,
-              nameController.text,
-              budget: budget,
-            );
-            ref.invalidate(singleListProvider(list.id));
-          } else {
-            ref
-                .read(shoppingListsViewModelProvider(userId).notifier)
-                .addList(
-              nameController.text,
-              budget: budget,
-            );
-          }
-
-          ref.invalidate(dashboardViewModelProvider(userId));
-          Navigator.of(context).pop();
-        },
-        child: const Text('Salvar'),
-      ),
-    ],
-  );
-}
 
 class _ShoppingListsBackground extends StatelessWidget {
   _ShoppingListsBackground();
@@ -213,8 +119,8 @@ class ShoppingListsScreen extends ConsumerWidget {
               return _ShoppingListItem(
                 list: list,
                 onEdit: () => showAddOrEditListDialog(
-                  context,
-                  ref,
+                  context: context,
+                  ref: ref,
                   userId: userId,
                   list: list,
                 ),
@@ -325,7 +231,6 @@ class _EmptyState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // <<< CORREÇÃO APLICADA AQUI >>>
               Icon(Icons.shopping_cart_outlined,
                   size: 60, color: scheme.secondary),
               const SizedBox(height: 20),
@@ -491,7 +396,6 @@ class _ShoppingListItem extends ConsumerWidget {
                 MaterialPageRoute(
                   builder: (context) => ListItemsScreen(
                     shoppingListId: list.id,
-                    onEditList: onEdit,
                   ),
                 ),
               ).then((_) {

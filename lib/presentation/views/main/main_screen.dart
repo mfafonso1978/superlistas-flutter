@@ -1,9 +1,9 @@
 // lib/presentation/views/main/main_screen.dart
-
-import 'dart:ui';
+import 'dart:ui'; // <<< CORREÇÃO: Import adicionado
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superlistas/core/ui/widgets/custom_drawer.dart';
+import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/history/history_screen.dart';
 import 'package:superlistas/presentation/views/home/home_screen.dart';
@@ -71,8 +71,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ),
           child: FloatingActionButton.extended(
             onPressed: () => showAddOrEditListDialog(
-              context,
-              ref,
+              context: context,
+              ref: ref,
               userId: userId,
             ),
             label: const Text('Nova Lista'),
@@ -107,12 +107,12 @@ class _MainBottomNavBar extends ConsumerWidget {
                 end: Alignment.bottomRight,
                 colors: isDark
                     ? [
-                  scheme.surface.withOpacity(0.80),
-                  scheme.surface.withOpacity(0.70),
+                  scheme.surface.withAlpha((255 * 0.80).toInt()),
+                  scheme.surface.withAlpha((255 * 0.70).toInt()),
                 ]
                     : [
-                  Colors.white.withOpacity(0.6),
-                  Colors.white.withOpacity(0.4),
+                  Colors.white.withAlpha((255 * 0.6).toInt()),
+                  Colors.white.withAlpha((255 * 0.4).toInt()),
                 ],
               ),
               border: Border(
@@ -145,8 +145,7 @@ class _MainBottomNavBar extends ConsumerWidget {
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,
               elevation: 0,
-              // <<< MUDANÇA AQUI: Cor azul mais escuro para seleção >>>
-              selectedItemColor: const Color(0xFF1565C0), // Azul mais escuro
+              selectedItemColor: const Color(0xFF1565C0),
               unselectedItemColor: scheme.onSurface.withOpacity(0.6),
             ),
           ),

@@ -21,10 +21,8 @@ final unitsProvider = FutureProvider.autoDispose<List<String>>((ref) {
 
 class ListItemsScreen extends ConsumerWidget {
   final String shoppingListId;
-  final VoidCallback? onEditList;
 
-  const ListItemsScreen(
-      {super.key, required this.shoppingListId, this.onEditList});
+  const ListItemsScreen({super.key, required this.shoppingListId});
 
   void _showItemFormModal(
       BuildContext context,
@@ -35,7 +33,7 @@ class ListItemsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color glassColor = (isDark ? theme.colorScheme.surface : Colors.white).withOpacity(0.85);
+    final Color glassColor = (isDark ? theme.colorScheme.surface : Colors.white).withAlpha((255 * 0.85).toInt());
 
     showModalBottomSheet<void>(
       context: context,
@@ -101,7 +99,7 @@ class ListItemsScreen extends ConsumerWidget {
           extendBodyBehindAppBar: true,
           body: Stack(
             children: [
-              AppBackground(), // <<< CORRIGIDO
+              AppBackground(),
               itemsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (err, stack) =>
@@ -116,7 +114,6 @@ class ListItemsScreen extends ConsumerWidget {
                         shoppingList: shoppingList,
                         items: items,
                         viewModel: viewModel,
-                        onEditList: onEditList,
                       ),
                       SliverToBoxAdapter(
                         child: _FinancialSummaryBar(
@@ -221,7 +218,6 @@ class ListItemsScreen extends ConsumerWidget {
         final isDark = theme.brightness == Brightness.dark;
 
         final headerColor = isDark ? Colors.white : theme.colorScheme.primary;
-
         final subHeaderColor = theme.colorScheme.secondary;
 
         final List<Widget> childrenWithDividers = [];
@@ -247,7 +243,7 @@ class ListItemsScreen extends ConsumerWidget {
               Divider(
                 height: 1,
                 thickness: 1,
-                color: (isDark ? Colors.white : theme.colorScheme.primary).withOpacity(0.15),
+                color: (isDark ? Colors.white : theme.colorScheme.primary).withAlpha((255 * 0.15).toInt()),
                 indent: 16,
                 endIndent: 16,
               ),
@@ -280,11 +276,11 @@ class ListItemsScreen extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: subHeaderColor,
-                      shadows: [
+                      shadows: const [
                         Shadow(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black54,
                           blurRadius: 3,
-                          offset: const Offset(1,1),
+                          offset: Offset(1,1),
                         )
                       ]
                   ),
@@ -314,9 +310,9 @@ class ListItemsScreen extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color primaryColor = scheme.primary;
-    final itemTitleColor = isDark ? (item.isChecked ? Colors.white54 : Colors.white) : (item.isChecked ? primaryColor.withOpacity(0.5) : primaryColor);
-    final itemSubtitleColor = isDark ? Colors.white70 : primaryColor.withOpacity(0.7);
-    final itemIconColor = isDark ? Colors.white70 : primaryColor.withOpacity(0.6);
+    final itemTitleColor = isDark ? (item.isChecked ? Colors.white54 : Colors.white) : (item.isChecked ? primaryColor.withAlpha((255 * 0.5).toInt()) : primaryColor);
+    final itemSubtitleColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
+    final itemIconColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
 
     return CheckboxListTile(
       activeColor: scheme.secondary,
@@ -369,13 +365,11 @@ class _ItemsSliverAppBar extends ConsumerWidget {
   final ShoppingList shoppingList;
   final List<Item> items;
   final ListItemsViewModel viewModel;
-  final VoidCallback? onEditList;
 
   const _ItemsSliverAppBar({
     required this.shoppingList,
     required this.items,
     required this.viewModel,
-    this.onEditList,
   });
 
   @override
@@ -401,8 +395,8 @@ class _ItemsSliverAppBar extends ConsumerWidget {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             color: isDark
-                ? scheme.surface.withOpacity(0.3)
-                : Colors.white.withOpacity(0.2),
+                ? scheme.surface.withAlpha((255 * 0.3).toInt())
+                : Colors.white.withAlpha((255 * 0.2).toInt()),
           ),
         ),
       ),
@@ -448,7 +442,12 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                 );
               }
             } else if (value == 'edit') {
-              onEditList?.call();
+              showAddOrEditListDialog(
+                context: context,
+                ref: ref,
+                userId: shoppingList.userId,
+                list: shoppingList,
+              );
             } else if (value == 'analysis') {
               Navigator.push(
                 context,
@@ -464,10 +463,9 @@ class _ItemsSliverAppBar extends ConsumerWidget {
               enabled: isConcludeEnabled,
               child: const Text('Concluir compra'),
             ),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'edit',
-              enabled: onEditList != null,
-              child: const Text('Editar Lista'),
+              child: Text('Editar Lista'),
             ),
             const PopupMenuItem<String>(
                 value: 'analysis', child: Text('Análise da Lista')),
@@ -489,8 +487,8 @@ class _FinancialSummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final currencyFormat =
     NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
@@ -498,8 +496,8 @@ class _FinancialSummaryBar extends StatelessWidget {
         shoppingList.budget != null && shoppingList.budget! > 0;
     final double balance = hasBudget ? shoppingList.budget! - totalCost : 0.0;
 
-    final Color valueColor = Colors.white;
-    final Color labelColor = Colors.white70;
+    const Color valueColor = Colors.white;
+    const Color labelColor = Colors.white70;
     final Color balanceColor = balance >= 0
         ? Colors.greenAccent.shade200
         : Colors.redAccent.shade100;
@@ -510,9 +508,7 @@ class _FinancialSummaryBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.black.withOpacity(0.2)
-                : Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.2 : 0.1)).toInt()),
             border: Border(
                 bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
           ),
@@ -522,12 +518,12 @@ class _FinancialSummaryBar extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Total',
+                  const Text('Total',
                       style: TextStyle(fontSize: 12, color: labelColor)),
                   const SizedBox(height: 2),
                   Text(
                     currencyFormat.format(totalCost),
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: valueColor),
@@ -537,12 +533,12 @@ class _FinancialSummaryBar extends StatelessWidget {
               if (hasBudget)
                 Column(
                   children: [
-                    Text('Limite',
+                    const Text('Limite',
                         style: TextStyle(fontSize: 12, color: labelColor)),
                     const SizedBox(height: 2),
                     Text(
                       currencyFormat.format(shoppingList.budget),
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                           color: valueColor),
@@ -553,7 +549,7 @@ class _FinancialSummaryBar extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('Saldo',
+                    const Text('Saldo',
                         style: TextStyle(fontSize: 12, color: labelColor)),
                     const SizedBox(height: 2),
                     Text(

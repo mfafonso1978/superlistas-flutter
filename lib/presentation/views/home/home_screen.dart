@@ -5,13 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
+import 'package:superlistas/core/ui/widgets/shared_widgets.dart'; // <<< IMPORT ATUALIZADO
 import 'package:superlistas/domain/entities/dashboard_data.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
-import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart'
-    show showAddOrEditListDialog;
+// O 'show...' não é mais necessário aqui
+// import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart'
+//     show showAddOrEditListDialog;
 
 const double _kHomeAppBarHeight = kToolbarHeight + 64;
 
@@ -222,7 +224,6 @@ class _DashboardSliverAppBar extends StatelessWidget {
                             width: 52,
                             height: 52,
                             errorBuilder: (context, error, stackTrace) {
-                              print("Erro ao carregar imagem do avatar: $error");
                               return Icon(
                                 Icons.person,
                                 color: scheme.secondary,
@@ -327,7 +328,7 @@ List<Widget> _buildDataSlivers({
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _EmptyRecent(userId: userId, refetchKey: userId),
+          child: _EmptyRecent(userId: userId),
         ),
       )
     else
@@ -610,14 +611,6 @@ class _QuickActionsBar extends ConsumerWidget {
         MaterialPageRoute(
           builder: (context) => ListItemsScreen(
             shoppingListId: listId,
-            onEditList: known == null
-                ? null
-                : () => showAddOrEditListDialog(
-              context,
-              ref,
-              userId: userId,
-              list: known,
-            ),
           ),
         ),
       ).then((_) => ref.invalidate(dashboardViewModelProvider(userId)));
@@ -700,7 +693,7 @@ class _QuickActionsBar extends ConsumerWidget {
         label: 'Nova lista',
         onTap: () {
           HapticFeedback.lightImpact();
-          showAddOrEditListDialog(context, ref, userId: userId);
+          showAddOrEditListDialog(context: context, ref: ref, userId: userId);
         },
         isPrimary: true,
       ),
@@ -716,8 +709,6 @@ class _QuickActionsBar extends ConsumerWidget {
             MaterialPageRoute(
               builder: (_) => ListItemsScreen(
                 shoppingListId: lastActive!.id,
-                onEditList: () => showAddOrEditListDialog(context, ref,
-                    userId: userId, list: lastActive),
               ),
             ),
           ).then(
@@ -900,7 +891,7 @@ class _RecentHeader extends ConsumerWidget {
             foregroundColor: scheme.secondary,
           ),
           icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-          label: Text(
+          label: const Text(
             'Ver todas',
             style: TextStyle(
               fontWeight: FontWeight.bold,
@@ -914,9 +905,8 @@ class _RecentHeader extends ConsumerWidget {
 
 class _EmptyRecent extends ConsumerWidget {
   final String userId;
-  final String refetchKey;
 
-  const _EmptyRecent({required this.userId, required this.refetchKey});
+  const _EmptyRecent({required this.userId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -980,7 +970,7 @@ class _EmptyRecent extends ConsumerWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () {
-                showAddOrEditListDialog(context, ref, userId: userId);
+                showAddOrEditListDialog(context: context, ref: ref, userId: userId);
               },
               icon: const Icon(Icons.add_rounded),
               label: const Text('Criar primeira lista'),
@@ -1082,8 +1072,6 @@ class _RecentListCard extends ConsumerWidget {
                 MaterialPageRoute(
                   builder: (_) => ListItemsScreen(
                     shoppingListId: list.id,
-                    onEditList: () => showAddOrEditListDialog(context, ref,
-                        userId: userId, list: list),
                   ),
                 ),
               ).then((_) => ref.invalidate(dashboardViewModelProvider(userId)));
