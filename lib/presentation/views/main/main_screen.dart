@@ -98,24 +98,42 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   ],
                 ),
               ),
+              // Organizando os botões lado a lado
+              actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               actions: <Widget>[
-                if (!isMandatory)
-                  TextButton(
-                    child: const Text('Depois'),
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                  ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isMandatory ? Colors.red : Colors.teal,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Atualizar Agora'),
-                  onPressed: () async {
-                    final url = Uri.parse(remoteConfigService.updateUrl);
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(url, mode: LaunchMode.externalApplication);
-                    }
-                  },
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    if (!isMandatory)
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Depois'),
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                        ),
+                      ),
+                    if (!isMandatory) const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isMandatory ? Colors.red : Colors.teal,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('Atualizar Agora'),
+                        onPressed: () async {
+                          final url = Uri.parse(remoteConfigService.updateUrl);
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -148,7 +166,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     return Scaffold(
       key: scaffoldKey,
-      drawer: const CustomDrawer(),
+      drawer: CustomDrawer(isPremium: isPremium),
       extendBody: true,
       body: Stack(
         children: [

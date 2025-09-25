@@ -10,7 +10,9 @@ import 'package:superlistas/presentation/views/categories/categories_screen.dart
 import 'package:superlistas/presentation/views/settings/settings_screen.dart';
 
 class CustomDrawer extends ConsumerWidget {
-  const CustomDrawer({super.key});
+  // <<< MUDANÇA: Recebendo o status 'isPremium' >>>
+  final bool isPremium;
+  const CustomDrawer({super.key, required this.isPremium});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,13 +77,23 @@ class CustomDrawer extends ConsumerWidget {
                         currentIndex: currentIndex,
                         onTap: () => _onItemTapped(context, ref, 2),
                       ),
+                      // <<< MUDANÇA: Lógica de bloqueio aplicada aqui >>>
                       _buildDrawerItem(
                         context,
-                        icon: Icons.bar_chart_rounded,
+                        icon: isPremium ? Icons.bar_chart_rounded : Icons.lock_outline,
                         text: 'Estatísticas',
                         itemIndex: 3,
                         currentIndex: currentIndex,
-                        onTap: () => _onItemTapped(context, ref, 3),
+                        onTap: () {
+                          if (isPremium) {
+                            _onItemTapped(context, ref, 3);
+                          } else {
+                            Navigator.pop(context); // Fecha o drawer
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Funcionalidade Premium!')),
+                            );
+                          }
+                        },
                       ),
                       Divider(
                           color: scheme.outlineVariant.withOpacity(0.3),
@@ -105,9 +117,9 @@ class CustomDrawer extends ConsumerWidget {
                         context,
                         icon: Icons.logout,
                         text: 'Sair',
-                        // <<< MUDANÇA PRINCIPAL AQUI >>>
                         onTap: () async {
-                          // O 'context' do build do Drawer já pode encontrar o Navigator.
+                          Navigator.pop(context);
+
                           final bool? confirm = await showGlassDialog<bool>(
                             context: context,
                             title: Row(
@@ -134,8 +146,6 @@ class CustomDrawer extends ConsumerWidget {
                             ],
                           );
 
-                          // Se o usuário confirmou, então realizamos o signOut.
-                          // O AuthWrapper cuidará de remover o Drawer e navegar para a tela de login.
                           if (confirm == true) {
                             ref.read(authViewModelProvider.notifier).signOut();
                           }
