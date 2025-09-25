@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superlistas/core/ui/widgets/custom_drawer.dart';
-import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/history/history_screen.dart';
@@ -57,59 +56,72 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     if (!mounted) return;
 
     final remoteConfigService = ref.read(remoteConfigServiceProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    final List<Widget> actions = [];
-
-    if (!isMandatory) {
-      actions.add(
-        TextButton(
-          child: const Text('Depois'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      );
-    }
-
-    actions.add(
-      ElevatedButton(
-        child: const Text('Atualizar Agora'),
-        onPressed: () async {
-          final url = Uri.parse(remoteConfigService.updateUrl);
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          }
-        },
-      ),
-    );
-
-    showGlassDialog(
+    showDialog(
       context: context,
       barrierDismissible: !isMandatory,
-      title: FittedBox( // <<< CORREÇÃO APLICADA AQUI
-        fit: BoxFit.scaleDown, // Garante que o conteúdo encolha se for muito grande
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isMandatory ? Icons.system_update_alt_rounded : Icons.info_outline_rounded,
-              color: Theme.of(context).colorScheme.secondary,
+      builder: (BuildContext dialogContext) {
+        return PopScope(
+          canPop: !isMandatory,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: AlertDialog(
+              backgroundColor: (isDark ? theme.colorScheme.surface : Colors.white)
+                  .withAlpha((255 * 0.85).toInt()),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: Colors.white.withOpacity(0.2)),
+              ),
+              title: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isMandatory ? Icons.system_update_alt_rounded : Icons.info_outline_rounded,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
+                  ],
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
+                    const SizedBox(height: 16),
+                    const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                if (!isMandatory)
+                  TextButton(
+                    child: const Text('Depois'),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isMandatory ? Colors.red : Colors.teal,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Atualizar Agora'),
+                  onPressed: () async {
+                    final url = Uri.parse(remoteConfigService.updateUrl);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
-          ],
-        ),
-      ),
-      content: SingleChildScrollView(
-        child: ListBody(
-          children: <Widget>[
-            Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
-            const SizedBox(height: 16),
-            const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
-          ],
-        ),
-      ),
-      actions: actions,
-      swapActionsOrder: !isMandatory,
+          ),
+        );
+      },
     );
   }
 

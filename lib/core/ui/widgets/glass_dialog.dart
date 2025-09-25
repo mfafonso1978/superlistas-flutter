@@ -1,78 +1,50 @@
 // lib/core/ui/widgets/glass_dialog.dart
-//
-// Dialog “glass” com:
-// - NÃO encolhe com o teclado (só sobe o necessário)
-// - Cabeçalho (ícone + título) centralizado e colado no topo
-// - Botões Cancelar (azul) e Salvar (teal) lado a lado
-// - Parâmetros completos para personalização, incluindo cor do título por tema
-
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
 Future<T?> showGlassDialog<T>({
   required BuildContext context,
-  required Widget title,         // Passe um Row(Icon + Text) aqui (não fixe cor/tamanho)
-  required Widget content,       // Passe seu formulário/Widgets aqui
-  required List<Widget> actions, // Ex.: [TextButton(...), ElevatedButton(...)]
-
-  // ============================
-  //   PARÂMETROS AJUSTÁVEIS
-  // ============================
-
-  // Fundo/fechamento:
-  bool barrierDismissible = true,                 // AJUSTE AQUI: permitir fechar tocando fora
-  Color barrierTint = Colors.black38,             // AJUSTE AQUI: véu de fundo
-
-  // Tamanho/posicionamento do CARD:
-  double maxHeightFraction = 0.40,                // <<< REDUZIDO DRASTICAMENTE (40% da tela)
-  double minHeight = 200.0,                       // AJUSTE AQUI: altura mínima (dp)
-  double maxWidth = 320.0,                        // AJUSTE AQUI: largura máxima (dp)
-  double minWidth = 260.0,                        // AJUSTE AQUI: largura mínima (dp)
+  required Widget title,
+  required Widget content,
+  required List<Widget> actions,
+  bool barrierDismissible = true,
+  Color barrierTint = Colors.black38,
+  double maxHeightFraction = 0.40,
+  double minHeight = 200.0,
+  double maxWidth = 320.0,
+  double minWidth = 260.0,
   EdgeInsets cardInsets =
-  const EdgeInsets.symmetric(horizontal: 24, vertical: 24), // AJUSTE AQUI: margem do card na tela
-
-  // Vidro/raio:
-  double cardBorderRadius = 24.0,                 // AJUSTE AQUI: raio das bordas do card
-  double blurSigma = 10.0,                        // AJUSTE AQUI: intensidade do blur de vidro
-  double backgroundAlphaLight = 0.85,             // AJUSTE AQUI: opacidade no tema claro
-  double backgroundAlphaDark  = 0.80,             // AJUSTE AQUI: opacidade no tema escuro
-
-  // Inteligência contra topo/teclado:
-  double topSafeExtra = 12.0,                     // AJUSTE AQUI: folga mínima do topo da TELA
-  double bottomSafe  = 20.0,                      // AJUSTE AQUI: folga mínima acima do teclado
-
-  // Cabeçalho (título + ícone):
-  bool centerTitle = true,                        // AJUSTE AQUI: centraliza o cabeçalho
-  double titleFontSize = 24.0,                    // AJUSTE AQUI: tamanho do texto do título
-  FontWeight titleFontWeight = FontWeight.w700,   // AJUSTE AQUI: peso do título
-
-  // >>> Cor do título por tema
-  Color? titleColor,                              // Força uma cor única para claro/escuro (opcional)
-  Color titleColorLight = Colors.black,           // Cor no tema claro (padrão preto)
-  Color titleColorDark  = Colors.white,           // Cor no tema escuro (padrão branco)
-
+  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+  double cardBorderRadius = 24.0,
+  double blurSigma = 10.0,
+  double backgroundAlphaLight = 0.85,
+  double backgroundAlphaDark  = 0.80,
+  double topSafeExtra = 12.0,
+  double bottomSafe  = 20.0,
+  bool centerTitle = true,
+  double titleFontSize = 24.0,
+  FontWeight titleFontWeight = FontWeight.w700,
+  Color? titleColor,
+  Color titleColorLight = Colors.black,
+  Color titleColorDark  = Colors.white,
   EdgeInsets titlePadding =
-  const EdgeInsets.fromLTRB(16, 0, 16, 0),   // padding do título (top=0 cola no topo)
-  double titleBottomGap = 28.0,                   // espaço logo abaixo do título
-  double titleIconSize = 42.0,                    // tamanho do ícone do título
-  Color titleIconColor = Colors.black54,          // cor do ícone do título
-
-  // Conteúdo:
+  const EdgeInsets.fromLTRB(16, 0, 16, 0),
+  double titleBottomGap = 28.0,
+  double titleIconSize = 42.0,
+  Color titleIconColor = Colors.black54,
   EdgeInsets contentPadding =
   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-
-  // Rodapé (ações):
   EdgeInsets actionsPadding =
   const EdgeInsets.fromLTRB(16, 12, 16, 16),
-  bool actionsHorizontal = true,                  // true=lado a lado; false=empilhado
-  double actionsGap = 12.0,                       // espaço entre botões
-  double actionHeight = 44.0,                     // altura dos botões
-  double actionRadius = 12.0,                     // raio dos botões
-  Color cancelColor = Colors.blue,                // cor do botão Cancelar
-  Color saveColor   = Colors.teal,                // cor do botão Salvar
-  Color actionTextColor = Colors.white,           // cor do texto/ícone dos botões
-  bool swapActionsOrder = false,                  // inverte ordem (Salvar | Cancelar)
+  bool actionsHorizontal = true,
+  double actionsGap = 12.0,
+  double actionHeight = 44.0,
+  double actionRadius = 12.0,
+  Color cancelColor = Colors.blue,
+  Color saveColor   = Colors.teal,
+  Color actionTextColor = Colors.white,
+  bool swapActionsOrder = false,
 }) {
   assert(
   maxHeightFraction > 0 && maxHeightFraction <= 0.95,
@@ -84,7 +56,7 @@ Future<T?> showGlassDialog<T>({
     barrierDismissible: barrierDismissible,
     barrierColor: barrierTint,
     useRootNavigator: true,
-    useSafeArea: false, // controlamos manualmente
+    useSafeArea: false,
     builder: (context) {
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -92,9 +64,8 @@ Future<T?> showGlassDialog<T>({
           final theme  = Theme.of(context);
           final scheme = theme.colorScheme;
 
-          // ===== Cálculo de altura/largura e teclado =====
-          final screenH    = constraints.maxHeight;
-          final keyboard   = media.viewInsets.bottom;
+          final screenH   = constraints.maxHeight;
+          final keyboard  = media.viewInsets.bottom;
           final availableH = screenH - cardInsets.vertical;
 
           final targetH = math.max(
@@ -112,12 +83,10 @@ Future<T?> showGlassDialog<T>({
           final maxW = math.min(maxWidth, constraints.maxWidth - cardInsets.horizontal);
           final minW = math.min(minWidth, maxW);
 
-          // ===== Fundo “glass” =====
           final bool isDark = theme.brightness == Brightness.dark;
           final Color baseColor = (isDark ? scheme.surface : Colors.white)
-              .withOpacity(isDark ? backgroundAlphaDark : backgroundAlphaLight);
+              .withAlpha((255 * (isDark ? backgroundAlphaDark : backgroundAlphaLight)).toInt());
 
-          // ===== Cabeçalho =====
           Widget buildTitle(Widget child) {
             final Color effectiveTitleColor =
                 titleColor ?? (isDark ? titleColorDark : titleColorLight);
@@ -142,7 +111,6 @@ Future<T?> showGlassDialog<T>({
             return styled;
           }
 
-          // ===== Helpers para ações coloridas =====
           VoidCallback? extractOnPressed(Widget w) {
             if (w is TextButton)     return w.onPressed;
             if (w is ElevatedButton) return w.onPressed;
@@ -157,7 +125,7 @@ Future<T?> showGlassDialog<T>({
             return w;
           }
 
-          List<Widget> _normalizeActions(List<Widget> raw) {
+          List<Widget> normalizeActions(List<Widget> raw) {
             return raw.where((w) => w is! SizedBox && w is! Spacer).toList();
           }
 
@@ -189,128 +157,73 @@ Future<T?> showGlassDialog<T>({
           }
 
           Widget buildActionsBar(List<Widget> actsRaw) {
-            final acts = _normalizeActions(actsRaw);
+            final acts = normalizeActions(actsRaw);
 
-            if (actionsHorizontal) {
-              if (acts.length == 2) {
-                final left  = swapActionsOrder ? acts[1] : acts[0]; // Cancelar
-                final right = swapActionsOrder ? acts[0] : acts[1]; // Salvar
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: actionHeight,
-                        child: coloredAction(
-                          color: cancelColor,
-                          child: extractChild(left),
-                          onTap: extractOnPressed(left),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: actionsGap),
-                    Expanded(
-                      child: SizedBox(
-                        height: actionHeight,
-                        child: coloredAction(
-                          color: saveColor,
-                          child: extractChild(right),
-                          onTap: extractOnPressed(right),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              if (acts.length >= 3) {
-                final delete = acts[0];
-                final left   = swapActionsOrder ? acts[2] : acts[1]; // Cancelar
-                final right  = swapActionsOrder ? acts[1] : acts[2]; // Salvar
-                return Row(
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44, minWidth: 100),
-                      child: SizedBox(
-                        height: actionHeight,
-                        child: coloredAction(
-                          color: Colors.red,
-                          child: extractChild(delete),
-                          onTap: extractOnPressed(delete),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: actionsGap),
-                    Expanded(
-                      child: SizedBox(
-                        height: actionHeight,
-                        child: coloredAction(
-                          color: cancelColor,
-                          child: extractChild(left),
-                          onTap: extractOnPressed(left),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: actionsGap),
-                    Expanded(
-                      child: SizedBox(
-                        height: actionHeight,
-                        child: coloredAction(
-                          color: saveColor,
-                          child: extractChild(right),
-                          onTap: extractOnPressed(right),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
+            if (acts.length == 1) {
+              final action = acts.first;
+              return SizedBox(
+                height: actionHeight,
+                child: coloredAction(
+                  color: saveColor,
+                  child: extractChild(action),
+                  onTap: extractOnPressed(action),
+                ),
+              );
             }
 
-            if (!actionsHorizontal) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
+            if (actionsHorizontal && acts.length == 2) {
+              final left  = swapActionsOrder ? acts[1] : acts[0];
+              final right = swapActionsOrder ? acts[0] : acts[1];
+              return Row(
                 children: [
-                  for (int i = 0; i < acts.length; i++) ...[
-                    SizedBox(
+                  Expanded(
+                    child: SizedBox(
                       height: actionHeight,
-                      width: double.infinity,
                       child: coloredAction(
-                        color: i == acts.length - 1 ? saveColor : cancelColor,
-                        child: extractChild(acts[i]),
-                        onTap: extractOnPressed(acts[i]),
+                        color: cancelColor,
+                        child: extractChild(left),
+                        onTap: extractOnPressed(left),
                       ),
                     ),
-                    if (i != acts.length - 1) SizedBox(height: actionsGap),
-                  ]
+                  ),
+                  SizedBox(width: actionsGap),
+                  Expanded(
+                    child: SizedBox(
+                      height: actionHeight,
+                      child: coloredAction(
+                        color: saveColor,
+                        child: extractChild(right),
+                        onTap: extractOnPressed(right),
+                      ),
+                    ),
+                  ),
                 ],
               );
             }
 
             return OverflowBar(
-              alignment: MainAxisAlignment.spaceBetween,
+              alignment: MainAxisAlignment.end,
               spacing: actionsGap,
-              overflowSpacing: actionsGap,
               children: acts,
             );
           }
 
           final actionsBar = buildActionsBar(actions);
 
-          // ===== Construção do card/dialog =====
           return MediaQuery.removeViewInsets(
-            removeBottom: true, // evita “encolher” com teclado
+            removeBottom: true,
             context: context,
             child: Align(
               alignment: Alignment.center,
               child: Padding(
                 padding: cardInsets,
                 child: Transform.translate(
-                  offset: Offset(0, -lift), // sobe só o necessário
+                  offset: Offset(0, -lift),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minWidth: minW,
                       maxWidth: maxW,
-                      maxHeight: targetH, // teto (conteúdo rola se passar)
+                      maxHeight: targetH,
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(cardBorderRadius),
@@ -326,8 +239,6 @@ Future<T?> showGlassDialog<T>({
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(cardBorderRadius),
                             ),
-
-                            // Cabeçalho colado no topo
                             titlePadding: titlePadding,
                             title: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -336,8 +247,6 @@ Future<T?> showGlassDialog<T>({
                                 if (titleBottomGap > 0) SizedBox(height: titleBottomGap),
                               ],
                             ),
-
-                            // Corpo (scrollável quando necessário)
                             contentPadding: contentPadding,
                             scrollable: true,
                             content: DefaultTextStyle(
@@ -345,8 +254,6 @@ Future<T?> showGlassDialog<T>({
                                   theme.textTheme.bodyMedium!,
                               child: content,
                             ),
-
-                            // Rodapé (botões)
                             actionsPadding: actionsPadding,
                             actions: [actionsBar],
                           ),
