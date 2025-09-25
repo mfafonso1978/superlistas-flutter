@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superlistas/core/ui/widgets/custom_drawer.dart';
+import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/history/history_screen.dart';
@@ -57,43 +58,58 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     final remoteConfigService = ref.read(remoteConfigServiceProvider);
 
-    showDialog(
+    final List<Widget> actions = [];
+
+    if (!isMandatory) {
+      actions.add(
+        TextButton(
+          child: const Text('Depois'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      );
+    }
+
+    actions.add(
+      ElevatedButton(
+        child: const Text('Atualizar Agora'),
+        onPressed: () async {
+          final url = Uri.parse(remoteConfigService.updateUrl);
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        },
+      ),
+    );
+
+    showGlassDialog(
       context: context,
       barrierDismissible: !isMandatory,
-      builder: (context) => PopScope(
-        canPop: !isMandatory,
-        child: AlertDialog(
-          title: Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
-                const SizedBox(height: 16),
-                const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
-              ],
+      title: FittedBox( // <<< CORREÇÃO APLICADA AQUI
+        fit: BoxFit.scaleDown, // Garante que o conteúdo encolha se for muito grande
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isMandatory ? Icons.system_update_alt_rounded : Icons.info_outline_rounded,
+              color: Theme.of(context).colorScheme.secondary,
             ),
-          ),
-          actions: <Widget>[
-            if (!isMandatory)
-              TextButton(
-                child: const Text('Depois'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ElevatedButton(
-              child: const Text('Atualizar Agora'),
-              onPressed: () async {
-                final url = Uri.parse(remoteConfigService.updateUrl);
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
+            const SizedBox(width: 12),
+            Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
           ],
         ),
       ),
+      content: SingleChildScrollView(
+        child: ListBody(
+          children: <Widget>[
+            Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
+            const SizedBox(height: 16),
+            const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
+          ],
+        ),
+      ),
+      actions: actions,
+      swapActionsOrder: !isMandatory,
     );
   }
 
