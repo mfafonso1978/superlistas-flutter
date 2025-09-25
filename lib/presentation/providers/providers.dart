@@ -1,8 +1,13 @@
 // lib/presentation/providers/providers.dart
+import 'package:firebase_remote_config/firebase_remote_config.dart'; // <<< ADICIONE ESTE
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // <<< ADICIONE ESTE
 import 'package:superlistas/core/database/database_helper.dart';
+import 'package:superlistas/data/datasources/firebase_auth_service.dart';
 import 'package:superlistas/data/datasources/local_datasource.dart';
+import 'package:superlistas/data/datasources/remote_config_service.dart'; // <<< ADICIONE ESTE
+import 'package:superlistas/data/repositories/firebase_auth_repository_impl.dart';
 import 'package:superlistas/data/repositories/shopping_list_repository_impl.dart';
 import 'package:superlistas/domain/entities/category.dart';
 import 'package:superlistas/domain/entities/dashboard_data.dart';
@@ -12,6 +17,7 @@ import 'package:superlistas/domain/entities/stats_data.dart';
 import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/domain/repositories/auth_repository.dart';
 import 'package:superlistas/domain/repositories/shopping_list_repository.dart';
+import 'package:superlistas/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/background_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/categories_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/dashboard_viewmodel.dart';
@@ -21,9 +27,6 @@ import 'package:superlistas/presentation/viewmodels/password_recovery_viewmodel.
 import 'package:superlistas/presentation/viewmodels/shopping_lists_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/stats_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/theme_viewmodel.dart';
-import 'package:superlistas/data/datasources/firebase_auth_service.dart';
-import 'package:superlistas/data/repositories/firebase_auth_repository_impl.dart';
-import 'package:superlistas/presentation/viewmodels/auth_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/units_viewmodel.dart';
 
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -130,4 +133,13 @@ StateNotifierProvider.autoDispose<UnitsViewModel, AsyncValue<List<String>>>(
 final backgroundProvider =
 StateNotifierProvider<BackgroundNotifier, String>((ref) {
   return BackgroundNotifier();
+});
+
+// <<< NOVOS PROVIDERS ADICIONADOS AQUI >>>
+final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
+  return RemoteConfigService(FirebaseRemoteConfig.instance);
+});
+
+final packageInfoProvider = FutureProvider<PackageInfo>((ref) {
+  return PackageInfo.fromPlatform();
 });

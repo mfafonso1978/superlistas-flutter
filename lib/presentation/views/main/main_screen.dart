@@ -1,5 +1,5 @@
 // lib/presentation/views/main/main_screen.dart
-import 'dart:ui'; // <<< CORREÇÃO: Import adicionado
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superlistas/core/ui/widgets/custom_drawer.dart';
@@ -9,6 +9,7 @@ import 'package:superlistas/presentation/views/history/history_screen.dart';
 import 'package:superlistas/presentation/views/home/home_screen.dart';
 import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart';
 import 'package:superlistas/presentation/views/stats/stats_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
@@ -22,6 +23,81 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkVersion();
+    });
+  }
+
+  Future<void> _checkVersion() async {
+    if (!mounted) return;
+
+    final remoteConfigService = ref.read(remoteConfigServiceProvider);
+    await remoteConfigService.initialize();
+
+    if (!mounted) return;
+
+    final packageInfo = await ref.read(packageInfoProvider.future);
+    final currentBuildNumber = int.parse(packageInfo.buildNumber);
+
+    final minVersion = remoteConfigService.minSupportedVersionCode;
+    final latestVersion = remoteConfigService.latestVersionCode;
+
+    if (currentBuildNumber < minVersion) {
+      if (mounted) _showUpdateDialog(isMandatory: true);
+    } else if (currentBuildNumber < latestVersion) {
+      if (mounted) _showUpdateDialog(isMandatory: false);
+    }
+  }
+
+  void _showUpdateDialog({required bool isMandatory}) {
+    if (!mounted) return;
+
+    final remoteConfigService = ref.read(remoteConfigServiceProvider);
+
+    showDialog(
+      context: context,
+      barrierDismissible: !isMandatory,
+      builder: (context) => PopScope(
+        canPop: !isMandatory,
+        child: AlertDialog(
+          title: Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
+                const SizedBox(height: 16),
+                const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            if (!isMandatory)
+              TextButton(
+                child: const Text('Depois'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ElevatedButton(
+              child: const Text('Atualizar Agora'),
+              onPressed: () async {
+                final url = Uri.parse(remoteConfigService.updateUrl);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   static const List<Widget> _pages = <Widget>[
     HomeScreen(),
     ShoppingListsScreen(),
@@ -39,6 +115,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final remoteConfigService = ref.watch(remoteConfigServiceProvider);
+    final isPremium = remoteConfigService.isPremiumStatsEnabled;
+
     return Scaffold(
       key: scaffoldKey,
       drawer: const CustomDrawer(),
@@ -49,11 +128,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             index: selectedIndex,
             children: _pages,
           ),
-          const Positioned(
+          Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _MainBottomNavBar(),
+            child: _MainBottomNavBar(isPremium: isPremium),
           ),
         ],
       ),
@@ -86,7 +165,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 }
 
 class _MainBottomNavBar extends ConsumerWidget {
-  const _MainBottomNavBar();
+  final bool isPremium;
+  const _MainBottomNavBar({required this.isPremium});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -123,18 +203,29 @@ class _MainBottomNavBar extends ConsumerWidget {
               ),
             ),
             child: BottomNavigationBar(
-              items: const [
-                BottomNavigationBarItem(
+              items: <BottomNavigationBarItem>[
+                const BottomNavigationBarItem(
                     icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                     icon: Icon(Icons.list_alt_rounded), label: 'Listas'),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                     icon: Icon(Icons.history_rounded), label: 'Histórico'),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.bar_chart_rounded), label: 'Estatísticas'),
+                  icon: Icon(
+                    isPremium ? Icons.bar_chart_rounded : Icons.lock_outline,
+                  ),
+                  label: 'Estatísticas',
+                ),
               ],
               currentIndex: selectedIndex,
               onTap: (index) {
+                if (index == 3 && !isPremium) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Funcionalidade Premium!')),
+                  );
+                  return;
+                }
+
                 final user = ref.read(authViewModelProvider.notifier).currentUser;
                 if (index == 0 && user != null) {
                   ref.invalidate(dashboardViewModelProvider(user.id));

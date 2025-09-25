@@ -22,18 +22,22 @@ dependencies:
   uuid: ^4.4.0
   path: ^1.9.1
   bcrypt: ^1.1.3
-  firebase_core: ^2.30.1
-  firebase_auth: ^4.19.4
-  google_sign_in: ^6.2.1
   auto_size_text: ^3.0.0
   share_plus: ^9.0.0
   file_selector: ^1.0.3
+
+  # <<< MUDANÇA PRINCIPAL AQUI: Pacotes Firebase atualizados para compatibilidade >>>
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.1
+  google_sign_in: ^6.2.1
+  firebase_remote_config: ^5.0.0
+  package_info_plus: ^8.0.0
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # <<< CORREÇÃO: Pacote movido para dev_dependencies >>>
   flutter_launcher_icons: ^0.13.1
 
 flutter:
@@ -41,11 +45,9 @@ flutter:
 
   assets:
     - assets/
-    # <<< ADICIONADO: Garantir que a pasta do ícone seja incluída >>>
     - assets/launcher_icon/
     - assets/images/
 
-# <<< ADICIONADO: Configuração para o gerador de ícones >>>
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
