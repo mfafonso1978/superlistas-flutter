@@ -26,6 +26,7 @@ class ListItemsScreen extends ConsumerWidget {
 
   void _showItemFormModal(
       BuildContext context,
+      WidgetRef ref,
       ShoppingList shoppingList, {
         required double currentTotalCost,
         Item? item,
@@ -80,6 +81,8 @@ class ListItemsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final shoppingListAsync = ref.watch(singleListProvider(shoppingListId));
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final addItemEnabled = remoteConfig.isAddItemEnabled;
 
     return shoppingListAsync.when(
       loading: () => Scaffold(
@@ -115,10 +118,11 @@ class ListItemsScreen extends ConsumerWidget {
                         items: items,
                         viewModel: viewModel,
                       ),
-                      SliverToBoxAdapter(
-                        child: _FinancialSummaryBar(
-                            shoppingList: shoppingList, totalCost: totalCost),
-                      ),
+                      if (remoteConfig.isFinancialSummaryBarEnabled)
+                        SliverToBoxAdapter(
+                          child: _FinancialSummaryBar(
+                              shoppingList: shoppingList, totalCost: totalCost),
+                        ),
                       if (items.isEmpty)
                         const SliverFillRemaining(
                           hasScrollBody: false,
@@ -147,7 +151,7 @@ class ListItemsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          floatingActionButton: itemsAsync.when(
+          floatingActionButton: addItemEnabled ? itemsAsync.when(
             data: (items) {
               final double totalCost =
               items.fold(0.0, (sum, item) => sum + item.subtotal);
@@ -162,7 +166,7 @@ class ListItemsScreen extends ConsumerWidget {
                 child: FloatingActionButton(
                   onPressed: budgetExceeded
                       ? null
-                      : () => _showItemFormModal(context, shoppingList,
+                      : () => _showItemFormModal(context, ref, shoppingList,
                       currentTotalCost: totalCost),
                   backgroundColor: budgetExceeded
                       ? Colors.grey
@@ -171,21 +175,9 @@ class ListItemsScreen extends ConsumerWidget {
                 ),
               );
             },
-            loading: () => Container(
-              margin: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewPadding.bottom + 80,
-              ),
-              child: const FloatingActionButton(
-                  onPressed: null, backgroundColor: Colors.grey, child: Icon(Icons.add)),
-            ),
-            error: (_, __) => Container(
-              margin: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewPadding.bottom + 80,
-              ),
-              child: const FloatingActionButton(
-                  onPressed: null, backgroundColor: Colors.grey, child: Icon(Icons.add)),
-            ),
-          ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ) : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         );
       },
@@ -224,19 +216,7 @@ class ListItemsScreen extends ConsumerWidget {
         for (int i = 0; i < itemsInCategory.length; i++) {
           final item = itemsInCategory[i];
           childrenWithDividers.add(
-            Dismissible(
-              key: Key(item.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                color: Colors.red,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: const Icon(Icons.delete_forever, color: Colors.white),
-              ),
-              onDismissed: (_) => viewModel.deleteItem(item.id),
-              child: _buildItemTile(
-                  context, totalCost, item, viewModel, shoppingList),
-            ),
+            _buildItemTile(context, totalCost, item, viewModel, shoppingList),
           );
           if (i < itemsInCategory.length - 1) {
             childrenWithDividers.add(
@@ -276,11 +256,11 @@ class ListItemsScreen extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: subHeaderColor,
-                      shadows: const [
+                      shadows: [
                         Shadow(
-                          color: Colors.black54,
+                          color: Colors.black.withOpacity(0.6),
                           blurRadius: 3,
-                          offset: Offset(1,1),
+                          offset: const Offset(1,1),
                         )
                       ]
                   ),
@@ -314,49 +294,69 @@ class ListItemsScreen extends ConsumerWidget {
     final itemSubtitleColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
     final itemIconColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
 
-    return CheckboxListTile(
-      activeColor: scheme.secondary,
-      checkColor: scheme.onSecondary,
-      controlAffinity: ListTileControlAffinity.leading,
-      value: item.isChecked,
-      onChanged: (bool? newValue) {
-        final updatedItem = item.copyWith(isChecked: newValue ?? false);
-        viewModel.updateItem(updatedItem);
-      },
-      title: Text(
-        item.name,
-        style: TextStyle(
-          decoration:
-          item.isChecked ? TextDecoration.lineThrough : TextDecoration.none,
-          color: itemTitleColor,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${quantityFormat.format(item.quantity)} ${item.unit}  •  ${currencyFormat.format(item.price)}/${item.unit}',
-            style: TextStyle(color: itemSubtitleColor),
-          ),
-          Text(
-            'Subtotal: ${currencyFormat.format(item.subtotal)}',
-            style: TextStyle(color: itemSubtitleColor, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-      secondary: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: itemIconColor),
-            onPressed: () {
-              _showItemFormModal(context, shoppingList,
-                  currentTotalCost: currentTotalCost, item: item);
-            },
-          ),
-        ],
-      ),
+    return Consumer(
+        builder: (context, ref, child) {
+          final remoteConfig = ref.watch(remoteConfigServiceProvider);
+          final checkEnabled = remoteConfig.isCheckItemEnabled;
+          final editEnabled = remoteConfig.isEditItemEnabled;
+          final deleteEnabled = remoteConfig.isDeleteItemEnabled;
+
+          return Dismissible(
+            key: Key(item.id),
+            direction: deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
+            background: Container(
+              color: Colors.red,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: const Icon(Icons.delete_forever, color: Colors.white),
+            ),
+            onDismissed: (_) => viewModel.deleteItem(item.id),
+            child: CheckboxListTile(
+              activeColor: scheme.secondary,
+              checkColor: scheme.onSecondary,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: item.isChecked,
+              onChanged: checkEnabled ? (bool? newValue) {
+                final updatedItem = item.copyWith(isChecked: newValue ?? false);
+                viewModel.updateItem(updatedItem);
+              } : null,
+              title: Text(
+                item.name,
+                style: TextStyle(
+                  decoration:
+                  item.isChecked ? TextDecoration.lineThrough : TextDecoration.none,
+                  color: itemTitleColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${quantityFormat.format(item.quantity)} ${item.unit}  •  ${currencyFormat.format(item.price)}/${item.unit}',
+                    style: TextStyle(color: itemSubtitleColor),
+                  ),
+                  Text(
+                    'Subtotal: ${currencyFormat.format(item.subtotal)}',
+                    style: TextStyle(color: itemSubtitleColor, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              secondary: editEnabled ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.edit_outlined, color: itemIconColor),
+                    onPressed: () {
+                      _showItemFormModal(context, ref, shoppingList,
+                          currentTotalCost: currentTotalCost, item: item);
+                    },
+                  ),
+                ],
+              ) : null,
+            ),
+          );
+        }
     );
   }
 }
@@ -378,9 +378,14 @@ class _ItemsSliverAppBar extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final archiveEnabled = remoteConfig.isArchiveListEnabled;
+    final editListEnabled = remoteConfig.isEditListEnabled;
+    final analysisEnabled = remoteConfig.isListAnalysisScreenEnabled;
+
     final checkedItemsCount = items.where((item) => item.isChecked).length;
     final bool isConcludeEnabled =
-        checkedItemsCount > 0 && !shoppingList.isArchived;
+        archiveEnabled && checkedItemsCount > 0 && !shoppingList.isArchived;
 
     final Color foregroundColor = isDark ? scheme.onSurface : Colors.white;
 
@@ -390,7 +395,7 @@ class _ItemsSliverAppBar extends ConsumerWidget {
       elevation: 0,
       iconTheme: IconThemeData(color: foregroundColor),
       actionsIconTheme: IconThemeData(color: foregroundColor),
-      flexibleSpace: ClipRect(
+      flexibleSpace: ClipRRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
@@ -409,68 +414,77 @@ class _ItemsSliverAppBar extends ConsumerWidget {
         overflow: TextOverflow.ellipsis,
       ),
       actions: [
-        PopupMenuButton<String>(
-          onSelected: (value) async {
-            if (value == 'complete') {
-              final bool? confirm = await showGlassDialog<bool>(
-                context: context,
-                title: const Text('Concluir Compra'),
-                content: const Text(
-                    'Tem certeza que deseja mover esta lista para o seu histórico?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancelar'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Sim, Concluir'),
-                  ),
-                ],
-              );
+        if (archiveEnabled || editListEnabled || analysisEnabled)
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'complete') {
+                final bool? confirm = await showGlassDialog<bool>(
+                  context: context,
+                  title: const Text('Concluir Compra'),
+                  content: const Text(
+                      'Tem certeza que deseja mover esta lista para o seu histórico?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Sim, Concluir'),
+                    ),
+                  ],
+                );
 
-              if (confirm == true) {
-                await viewModel.archiveList(shoppingList);
-                if (!context.mounted) return;
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Lista movida para o Histórico!')),
+                if (confirm == true) {
+                  await viewModel.archiveList(shoppingList);
+                  if (!context.mounted) return;
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Lista movida para o Histórico!')),
+                  );
+                }
+              } else if (value == 'edit') {
+                showAddOrEditListDialog(
+                  context: context,
+                  ref: ref,
+                  userId: shoppingList.userId,
+                  list: shoppingList,
+                );
+              } else if (value == 'analysis') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          ListAnalysisScreen(shoppingList: shoppingList)),
                 );
               }
-            } else if (value == 'edit') {
-              showAddOrEditListDialog(
-                context: context,
-                ref: ref,
-                userId: shoppingList.userId,
-                list: shoppingList,
-              );
-            } else if (value == 'analysis') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        ListAnalysisScreen(shoppingList: shoppingList)),
-              );
-            }
-          },
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            PopupMenuItem<String>(
-              value: 'complete',
-              enabled: isConcludeEnabled,
-              child: const Text('Concluir compra'),
-            ),
-            const PopupMenuItem<String>(
-              value: 'edit',
-              child: Text('Editar Lista'),
-            ),
-            const PopupMenuItem<String>(
-                value: 'analysis', child: Text('Análise da Lista')),
-          ],
-        ),
+            },
+            itemBuilder: (BuildContext context) {
+              final List<PopupMenuEntry<String>> menuItems = [];
+              if (archiveEnabled) {
+                menuItems.add(PopupMenuItem<String>(
+                  value: 'complete',
+                  enabled: isConcludeEnabled,
+                  child: const Text('Concluir compra'),
+                ));
+              }
+              if (editListEnabled) {
+                menuItems.add(const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Text('Editar Lista'),
+                ));
+              }
+              if (analysisEnabled) {
+                menuItems.add(const PopupMenuItem<String>(
+                    value: 'analysis', child: Text('Análise da Lista')));
+              }
+              return menuItems;
+            },
+          ),
       ],
     );
   }

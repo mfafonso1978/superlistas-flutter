@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
 import 'package:superlistas/core/ui/widgets/app_background.dart';
 import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/domain/entities/item.dart';
@@ -23,7 +24,6 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authViewModelProvider);
-
     if (currentUser == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -31,6 +31,7 @@ class HistoryScreen extends ConsumerWidget {
     final userId = currentUser.id;
     final historyAsync = ref.watch(historyViewModelProvider(userId));
     final scheme = Theme.of(context).colorScheme;
+    final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isHistoryPullToRefreshEnabled;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -38,8 +39,9 @@ class HistoryScreen extends ConsumerWidget {
         children: [
           AppBackground(),
           RefreshIndicator(
-            onRefresh: () =>
-                ref.read(historyViewModelProvider(userId).notifier).loadHistory(),
+            onRefresh: pullToRefreshEnabled
+                ? () => ref.read(historyViewModelProvider(userId).notifier).loadHistory()
+                : () async {},
             child: CustomScrollView(
               slivers: [
                 const _HistorySliverAppBar(),
@@ -104,7 +106,6 @@ class HistoryScreen extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // <<< CORREÇÃO APLICADA AQUI >>>
           Icon(Icons.receipt_long_outlined, size: 60, color: scheme.secondary),
           const SizedBox(height: 20),
           Text(
@@ -156,8 +157,8 @@ class _HistorySliverAppBar extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               color: isDark
-                  ? scheme.surface.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.2),
+                  ? scheme.surface.withAlpha((255 * 0.3).toInt())
+                  : Colors.white.withAlpha((255 * 0.2).toInt()),
             ),
             child: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
@@ -191,6 +192,11 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authViewModelProvider);
     if (currentUser == null) return const SizedBox.shrink();
+
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final viewItemsEnabled = remoteConfig.isHistoryViewItemsEnabled;
+    final reuseListEnabled = remoteConfig.isReuseListEnabled;
+    final deleteHistoryEnabled = remoteConfig.isDeleteHistoryListEnabled;
 
     final userId = currentUser.id;
     final scheme = Theme.of(context).colorScheme;
@@ -227,11 +233,11 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
         child: Column(
           children: [
             InkWell(
-              onTap: () {
+              onTap: viewItemsEnabled ? () {
                 setState(() {
                   _isExpanded = !_isExpanded;
                 });
-              },
+              } : null,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
                 child: Row(
@@ -259,62 +265,75 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                         ],
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert, color: scheme.onSurface),
-                      onSelected: (value) async {
-                        if (value == 'reuse') {
-                          await ref
-                              .read(historyViewModelProvider(userId).notifier)
-                              .reuseList(widget.list);
-                          if (!context.mounted) return;
-                          ref.invalidate(shoppingListsViewModelProvider(userId));
-                          ref.read(mainScreenIndexProvider.notifier).state = 1;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text(
-                                    'Lista "${widget.list.name}" reutilizada com sucesso!')),
-                          );
-                        } else if (value == 'delete') {
-                          final bool? shouldDelete = await showGlassDialog<bool>(
-                            context: context,
-                            title: const Text('Confirmar Exclusão'),
-                            content: Text(
-                                'Tem certeza de que deseja excluir permanentemente a lista "${widget.list.name}"?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () => Navigator.of(context).pop(true),
-                                child: const Text('Excluir'),
-                              ),
-                            ],
-                          );
-                          if (shouldDelete == true) {
+                    if(reuseListEnabled || deleteHistoryEnabled)
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert, color: scheme.onSurface),
+                        onSelected: (value) async {
+                          if (value == 'reuse') {
                             await ref
                                 .read(historyViewModelProvider(userId).notifier)
-                                .deleteList(widget.list.id);
+                                .reuseList(widget.list);
                             if (!context.mounted) return;
+                            ref.invalidate(shoppingListsViewModelProvider(userId));
+
+                            // Lógica para ir para a aba de listas
+                            int listsTabIndex = 1;
+                            if (ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled == false) {
+                              listsTabIndex = 0;
+                            }
+                            ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text('Lista "${widget.list.name}" excluída.')),
+                                  content: Text(
+                                      'Lista "${widget.list.name}" reutilizada com sucesso!')),
                             );
+                          } else if (value == 'delete') {
+                            final bool? shouldDelete = await showGlassDialog<bool>(
+                              context: context,
+                              title: const Text('Confirmar Exclusão'),
+                              content: Text(
+                                  'Tem certeza de que deseja excluir permanentemente a lista "${widget.list.name}"?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  child: const Text('Excluir'),
+                                ),
+                              ],
+                            );
+                            if (shouldDelete == true) {
+                              await ref
+                                  .read(historyViewModelProvider(userId).notifier)
+                                  .deleteList(widget.list.id);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text('Lista "${widget.list.name}" excluída.')),
+                              );
+                            }
                           }
-                        }
-                      },
-                      itemBuilder: (BuildContext context) =>
-                      const <PopupMenuEntry<String>>[
-                        PopupMenuItem<String>(
-                            value: 'reuse', child: Text('Reutilizar Lista')),
-                        PopupMenuItem<String>(
-                            value: 'delete', child: Text('Excluir Permanente')),
-                      ],
-                    ),
+                        },
+                        itemBuilder: (BuildContext context) {
+                          final List<PopupMenuEntry<String>> items = [];
+                          if (reuseListEnabled) {
+                            items.add(const PopupMenuItem<String>(
+                                value: 'reuse', child: Text('Reutilizar Lista')));
+                          }
+                          if (deleteHistoryEnabled) {
+                            items.add(const PopupMenuItem<String>(
+                                value: 'delete', child: Text('Excluir Permanente')));
+                          }
+                          return items;
+                        },
+                      ),
                   ],
                 ),
               ),

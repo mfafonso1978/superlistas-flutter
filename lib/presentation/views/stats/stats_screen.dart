@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:superlistas/core/ui/widgets/app_background.dart';
+import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
 import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/domain/entities/stats_data.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
@@ -16,22 +16,24 @@ class StatsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authViewModelProvider);
-
     if (currentUser == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final userId = currentUser.id;
 
+    final userId = currentUser.id;
     final statsAsync = ref.watch(statsViewModelProvider(userId));
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final pullToRefreshEnabled = remoteConfig.isStatsPullToRefreshEnabled;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          AppBackground(), // <<< CORRIGIDO
+          const _StatsBackground(),
           RefreshIndicator(
-            onRefresh: () =>
-                ref.read(statsViewModelProvider(userId).notifier).loadStats(),
+            onRefresh: pullToRefreshEnabled
+                ? () => ref.read(statsViewModelProvider(userId).notifier).loadStats()
+                : () async {},
             child: CustomScrollView(
               slivers: [
                 const _StatsSliverAppBar(),
@@ -46,11 +48,20 @@ class StatsScreen extends ConsumerWidget {
                       sliver: SliverList(
                         delegate: SliverChildListDelegate(
                           [
-                            _buildMetricsCard(context, stats),
-                            const SizedBox(height: 24),
-                            _buildBarChartCard(context, stats),
-                            const SizedBox(height: 24),
-                            _buildPieChartCard(context, stats),
+                            if (remoteConfig.isStatsMetricsCardEnabled)
+                              _buildMetricsCard(context, stats),
+
+                            if (remoteConfig.isStatsMetricsCardEnabled && remoteConfig.isStatsBarChartEnabled)
+                              const SizedBox(height: 24),
+
+                            if (remoteConfig.isStatsBarChartEnabled)
+                              _buildBarChartCard(context, stats),
+
+                            if (remoteConfig.isStatsBarChartEnabled && remoteConfig.isStatsPieChartEnabled)
+                              const SizedBox(height: 24),
+
+                            if (remoteConfig.isStatsPieChartEnabled)
+                              _buildPieChartCard(context, stats),
                           ],
                         ),
                       ),
@@ -62,6 +73,35 @@ class StatsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StatsBackground extends ConsumerWidget {
+  const _StatsBackground();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedKey = ref.watch(backgroundProvider);
+    final background = availableBackgrounds.firstWhere((b) => b.key == selectedKey, orElse: () => availableBackgrounds.first);
+    final imagePath = isDark ? background.darkAssetPath : background.lightAssetPath;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            imagePath,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+        ),
+        Positioned.fill(
+          child: ColoredBox(
+            color: Colors.black.withOpacity(isDark ? 0.55 : 0.35),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -93,8 +133,8 @@ class _StatsSliverAppBar extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               color: isDark
-                  ? scheme.surface.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.2),
+                  ? scheme.surface.withAlpha((255 * 0.3).toInt())
+                  : Colors.white.withAlpha((255 * 0.2).toInt()),
             ),
             child: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 60, bottom: 16),

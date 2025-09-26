@@ -5,15 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
-import 'package:superlistas/core/ui/widgets/shared_widgets.dart'; // <<< IMPORT ATUALIZADO
+import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/domain/entities/dashboard_data.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
-// O 'show...' não é mais necessário aqui
-// import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart'
-//     show showAddOrEditListDialog;
 
 const double _kHomeAppBarHeight = kToolbarHeight + 64;
 
@@ -77,15 +74,15 @@ class HomeScreen extends ConsumerWidget {
     );
 
     final dashboardDataAsync = ref.watch(dashboardViewModelProvider(userId));
+    final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isDashboardPullToRefreshEnabled;
 
     return Stack(
       children: [
         const Positioned.fill(child: HomeBackground()),
         RefreshIndicator(
-          edgeOffset: _kHomeAppBarHeight,
-          notificationPredicate: (n) => n.depth == 0,
-          onRefresh: () =>
-              ref.read(dashboardViewModelProvider(userId).notifier).loadData(),
+          onRefresh: pullToRefreshEnabled
+              ? () => ref.read(dashboardViewModelProvider(userId).notifier).loadData()
+              : () async {},
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
@@ -97,8 +94,8 @@ class HomeScreen extends ConsumerWidget {
                 error: (err, _) => _buildErrorSlivers('$err'),
                 data: (data) => _buildDataSlivers(
                   context: context,
+                  ref: ref,
                   userId: userId,
-                  userName: user.name,
                   data: data,
                 ),
               ),
@@ -259,10 +256,15 @@ class _DashboardSliverAppBar extends StatelessWidget {
 
 List<Widget> _buildDataSlivers({
   required BuildContext context,
+  required WidgetRef ref,
   required String userId,
-  required String userName,
   required DashboardData data,
 }) {
+  final remoteConfig = ref.watch(remoteConfigServiceProvider);
+  final metricsEnabled = remoteConfig.isDashboardMetricsEnabled;
+  final quickActionsEnabled = remoteConfig.isDashboardQuickActionsEnabled;
+  final recentListsEnabled = remoteConfig.isDashboardRecentListsEnabled;
+
   final recent = data.recentLists;
   final ShoppingList? lastActive =
   recent.where((l) => !l.isCompleted && !l.isArchived).isNotEmpty
@@ -270,71 +272,77 @@ List<Widget> _buildDataSlivers({
       : (recent.isNotEmpty ? recent.first : null);
 
   return [
-    SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      sliver: SliverGrid.count(
-        crossAxisCount: 2,
-        childAspectRatio: 1.65,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        children: [
-          _MetricCard(
-              data: _MetricCardData(
-                label: 'Ativas',
-                value: '${data.activeListsCount}',
-                icon: Icons.rocket_launch_rounded,
-                gradient: [Colors.blue.shade400, Colors.blue.shade600],
-              )),
-          _MetricCard(
-              data: _MetricCardData(
-                label: 'Pendentes',
-                value: '${data.pendingListsCount}',
-                icon: Icons.schedule_rounded,
-                gradient: [Colors.orange.shade400, Colors.orange.shade600],
-              )),
-          _MetricCard(
-              data: _MetricCardData(
-                label: 'Concluídas',
-                value: '${data.completedListsCount}',
-                icon: Icons.task_alt_rounded,
-                gradient: [Colors.green.shade400, Colors.green.shade600],
-              )),
-          _MetricCard(
-              data: _MetricCardData(
-                label: 'Vazias',
-                value: '${data.emptyListsCount}',
-                icon: Icons.inventory_2_outlined,
-                gradient: [Colors.grey.shade400, Colors.grey.shade600],
-              )),
-        ],
+    if (metricsEnabled) ...[
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        sliver: SliverGrid.count(
+          crossAxisCount: 2,
+          childAspectRatio: 1.65,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          children: [
+            _MetricCard(
+                data: _MetricCardData(
+                  label: 'Ativas',
+                  value: '${data.activeListsCount}',
+                  icon: Icons.rocket_launch_rounded,
+                  gradient: [Colors.blue.shade400, Colors.blue.shade600],
+                )),
+            _MetricCard(
+                data: _MetricCardData(
+                  label: 'Pendentes',
+                  value: '${data.pendingListsCount}',
+                  icon: Icons.schedule_rounded,
+                  gradient: [Colors.orange.shade400, Colors.orange.shade600],
+                )),
+            _MetricCard(
+                data: _MetricCardData(
+                  label: 'Concluídas',
+                  value: '${data.completedListsCount}',
+                  icon: Icons.task_alt_rounded,
+                  gradient: [Colors.green.shade400, Colors.green.shade600],
+                )),
+            _MetricCard(
+                data: _MetricCardData(
+                  label: 'Vazias',
+                  value: '${data.emptyListsCount}',
+                  icon: Icons.inventory_2_outlined,
+                  gradient: [Colors.grey.shade400, Colors.grey.shade600],
+                )),
+          ],
+        ),
       ),
-    ),
-    SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
-        child: _SectionTitle('Ações Rápidas', icon: Icons.flash_on_rounded),
-      ),
-    ),
-    SliverToBoxAdapter(
-      child: _QuickActionsBar(userId: userId, lastActive: lastActive),
-    ),
-    SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
-        child: _RecentHeader(userId: userId),
-      ),
-    ),
-    if (data.recentLists.isEmpty)
+    ],
+    if (quickActionsEnabled) ...[
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _EmptyRecent(userId: userId),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
+          child: _SectionTitle('Ações Rápidas', icon: Icons.flash_on_rounded),
         ),
-      )
-    else
-      SliverToBoxAdapter(
-        child: _RecentHorizontalList(userId: userId, lists: data.recentLists),
       ),
+      SliverToBoxAdapter(
+        child: _QuickActionsBar(userId: userId, lastActive: lastActive),
+      ),
+    ],
+    if (recentListsEnabled) ...[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
+          child: _RecentHeader(userId: userId),
+        ),
+      ),
+      if (data.recentLists.isEmpty)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _EmptyRecent(userId: userId),
+          ),
+        )
+      else
+        SliverToBoxAdapter(
+          child: _RecentHorizontalList(userId: userId, lists: data.recentLists),
+        ),
+    ],
   ];
 }
 
@@ -581,10 +589,10 @@ class _SectionTitle extends StatelessWidget {
             color: Colors.white,
             letterSpacing: -0.5,
             shadows: [
-              Shadow(
+              const Shadow(
                 blurRadius: 6.0,
-                color: Colors.black.withOpacity(0.4),
-                offset: const Offset(2.0, 2.0),
+                color: Colors.black45,
+                offset: Offset(2.0, 2.0),
               ),
             ],
           ),
@@ -603,7 +611,14 @@ class _QuickActionsBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vm = ref.read(shoppingListsViewModelProvider(userId).notifier);
-    final scheme = Theme.of(context).colorScheme;
+
+    // Lendo as flags de ações
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final addListEnabled = remoteConfig.isAddListEnabled;
+    final duplicateListEnabled = remoteConfig.isDuplicateListEnabled;
+    final templatesEnabled = remoteConfig.isTemplatesEnabled;
+    final archiveEnabled = remoteConfig.isArchiveListEnabled;
+    final viewAllEnabled = ref.watch(remoteConfigServiceProvider).isShoppingListsScreenEnabled;
 
     void openListById(String listId, {ShoppingList? known}) {
       Navigator.push(
@@ -684,19 +699,21 @@ class _QuickActionsBar extends ConsumerWidget {
     }
 
     void openAll() {
-      ref.read(mainScreenIndexProvider.notifier).state = 1;
+      final listsTabIndex = ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled ? 1 : 0;
+      ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
     }
 
-    final actions = [
-      _QuickAction(
-        icon: Icons.add_circle_rounded,
-        label: 'Nova lista',
-        onTap: () {
-          HapticFeedback.lightImpact();
-          showAddOrEditListDialog(context: context, ref: ref, userId: userId);
-        },
-        isPrimary: true,
-      ),
+    final List<_QuickAction> actions = [
+      if (addListEnabled)
+        _QuickAction(
+          icon: Icons.add_circle_rounded,
+          label: 'Nova lista',
+          onTap: () {
+            HapticFeedback.lightImpact();
+            showAddOrEditListDialog(context: context, ref: ref, userId: userId);
+          },
+          isPrimary: true,
+        ),
       _QuickAction(
         icon: Icons.play_circle_rounded,
         label: 'Continuar',
@@ -715,26 +732,30 @@ class _QuickActionsBar extends ConsumerWidget {
                   (_) => ref.invalidate(dashboardViewModelProvider(userId)));
         },
       ),
-      _QuickAction(
-        icon: Icons.content_copy_rounded,
-        label: 'Duplicar',
-        onTap: duplicateLast,
-      ),
-      _QuickAction(
-        icon: Icons.dashboard_rounded,
-        label: 'Modelos',
-        onTap: openTemplates,
-      ),
-      _QuickAction(
-        icon: Icons.archive_rounded,
-        label: 'Arquivar',
-        onTap: archiveCompleted,
-      ),
-      _QuickAction(
-        icon: Icons.list_alt_rounded,
-        label: 'Ver todas',
-        onTap: openAll,
-      ),
+      if (duplicateListEnabled)
+        _QuickAction(
+          icon: Icons.content_copy_rounded,
+          label: 'Duplicar',
+          onTap: duplicateLast,
+        ),
+      if (templatesEnabled)
+        _QuickAction(
+          icon: Icons.dashboard_rounded,
+          label: 'Modelos',
+          onTap: openTemplates,
+        ),
+      if (archiveEnabled)
+        _QuickAction(
+          icon: Icons.archive_rounded,
+          label: 'Arquivar',
+          onTap: archiveCompleted,
+        ),
+      if (viewAllEnabled)
+        _QuickAction(
+          icon: Icons.list_alt_rounded,
+          label: 'Ver todas',
+          onTap: openAll,
+        ),
     ];
 
     return SizedBox(
@@ -883,21 +904,23 @@ class _RecentHeader extends ConsumerWidget {
       children: [
         const _SectionTitle('Listas Recentes', icon: Icons.history_rounded),
         const Spacer(),
-        TextButton.icon(
-          onPressed: () {
-            ref.read(mainScreenIndexProvider.notifier).state = 1;
-          },
-          style: TextButton.styleFrom(
-            foregroundColor: scheme.secondary,
-          ),
-          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-          label: const Text(
-            'Ver todas',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+        if (ref.watch(remoteConfigServiceProvider).isShoppingListsScreenEnabled)
+          TextButton.icon(
+            onPressed: () {
+              final listsTabIndex = ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled ? 1 : 0;
+              ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: scheme.secondary,
+            ),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text(
+              'Ver todas',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -968,18 +991,19 @@ class _EmptyRecent extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () {
-                showAddOrEditListDialog(context: context, ref: ref, userId: userId);
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Criar primeira lista'),
-              style: FilledButton.styleFrom(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: scheme.secondary,
+            if(ref.watch(remoteConfigServiceProvider).isAddListEnabled)
+              FilledButton.icon(
+                onPressed: () {
+                  showAddOrEditListDialog(context: context, ref: ref, userId: userId);
+                },
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Criar primeira lista'),
+                style: FilledButton.styleFrom(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: scheme.secondary,
+                ),
               ),
-            ),
           ],
         ),
       ),

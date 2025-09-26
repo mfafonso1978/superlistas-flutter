@@ -14,6 +14,11 @@ class UnitsScreen extends ConsumerWidget {
     final unitsAsync = ref.watch(unitsViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
 
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final addUnitEnabled = remoteConfig.isAddUnitEnabled;
+    final editUnitEnabled = remoteConfig.isEditUnitEnabled;
+    final deleteUnitEnabled = remoteConfig.isDeleteUnitEnabled;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -22,7 +27,7 @@ class UnitsScreen extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          AppBackground(), // <<< CORRIGIDO
+          AppBackground(),
           SafeArea(
             child: unitsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -39,16 +44,16 @@ class UnitsScreen extends ConsumerWidget {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.edit_note_rounded, color: scheme.onSurfaceVariant),
-                            onPressed: () => _showAddOrEditUnitDialog(context, ref, unit: unit),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.delete_outline, color: scheme.error),
-                            onPressed: () => ref
-                                .read(unitsViewModelProvider.notifier)
-                                .deleteUnit(unit),
-                          ),
+                          if (editUnitEnabled)
+                            IconButton(
+                              icon: Icon(Icons.edit_note_rounded, color: scheme.onSurfaceVariant),
+                              onPressed: () => _showAddOrEditUnitDialog(context, ref, unit: unit),
+                            ),
+                          if (deleteUnitEnabled)
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, color: scheme.error),
+                              onPressed: () => _showDeleteConfirmationDialog(context, ref, unit),
+                            ),
                         ],
                       ),
                     ),
@@ -59,10 +64,10 @@ class UnitsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: addUnitEnabled ? FloatingActionButton(
         onPressed: () => _showAddOrEditUnitDialog(context, ref),
         child: const Icon(Icons.add),
-      ),
+      ) : null,
     );
   }
 
@@ -105,6 +110,28 @@ class UnitsScreen extends ConsumerWidget {
             }
           },
           child: const Text('Salvar'),
+        )
+      ],
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, String unit) {
+    showGlassDialog(
+      context: context,
+      title: const Text('Excluir Unidade'),
+      content: Text('Tem certeza que deseja excluir a unidade "$unit"?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () {
+            ref.read(unitsViewModelProvider.notifier).deleteUnit(unit);
+            Navigator.of(context).pop();
+          },
+          child: const Text('Excluir'),
         )
       ],
     );

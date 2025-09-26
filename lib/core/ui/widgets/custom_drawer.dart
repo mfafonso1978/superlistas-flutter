@@ -10,7 +10,6 @@ import 'package:superlistas/presentation/views/categories/categories_screen.dart
 import 'package:superlistas/presentation/views/settings/settings_screen.dart';
 
 class CustomDrawer extends ConsumerWidget {
-  // <<< MUDANÇA: Recebendo o status 'isPremium' >>>
   final bool isPremium;
   const CustomDrawer({super.key, required this.isPremium});
 
@@ -20,6 +19,15 @@ class CustomDrawer extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentIndex = ref.watch(mainScreenIndexProvider);
     final user = ref.watch(authViewModelProvider);
+
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final dashboardEnabled = remoteConfig.isDashboardScreenEnabled;
+    final listsEnabled = remoteConfig.isShoppingListsScreenEnabled;
+    final historyEnabled = remoteConfig.isHistoryScreenEnabled;
+    final statsEnabled = remoteConfig.isStatsScreenEnabled;
+    final categoriesEnabled = remoteConfig.isCategoriesScreenEnabled;
+    final settingsEnabled = remoteConfig.isSettingsScreenEnabled;
+    final themeToggleEnabled = remoteConfig.isThemeToggleEnabled;
 
     return Drawer(
       backgroundColor: Colors.transparent,
@@ -53,65 +61,71 @@ class CustomDrawer extends ConsumerWidget {
                     children: <Widget>[
                       _DrawerHeader(user: user),
                       const SizedBox(height: 8),
-                      _buildDrawerItem(
-                        context,
-                        icon: Icons.dashboard_rounded,
-                        text: 'Dashboard',
-                        itemIndex: 0,
-                        currentIndex: currentIndex,
-                        onTap: () => _onItemTapped(context, ref, 0),
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        icon: Icons.list_alt_rounded,
-                        text: 'Minhas Listas',
-                        itemIndex: 1,
-                        currentIndex: currentIndex,
-                        onTap: () => _onItemTapped(context, ref, 1),
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        icon: Icons.history_rounded,
-                        text: 'Histórico',
-                        itemIndex: 2,
-                        currentIndex: currentIndex,
-                        onTap: () => _onItemTapped(context, ref, 2),
-                      ),
-                      // <<< MUDANÇA: Lógica de bloqueio aplicada aqui >>>
-                      _buildDrawerItem(
-                        context,
-                        icon: isPremium ? Icons.bar_chart_rounded : Icons.lock_outline,
-                        text: 'Estatísticas',
-                        itemIndex: 3,
-                        currentIndex: currentIndex,
-                        onTap: () {
-                          if (isPremium) {
-                            _onItemTapped(context, ref, 3);
-                          } else {
-                            Navigator.pop(context); // Fecha o drawer
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Funcionalidade Premium!')),
-                            );
-                          }
-                        },
-                      ),
-                      Divider(
-                          color: scheme.outlineVariant.withOpacity(0.3),
-                          height: 16),
-                      _buildDrawerItem(
-                        context,
-                        icon: Icons.format_list_bulleted_rounded,
-                        text: 'Categorias',
-                        onTap: () => _navigateTo(context, const CategoriesScreen()),
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        icon: Icons.settings_rounded,
-                        text: 'Configurações',
-                        onTap: () => _navigateTo(context, const SettingsScreen()),
-                      ),
-                      Divider(
-                          color: scheme.outlineVariant.withOpacity(0.3),
+
+                      if (dashboardEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: Icons.dashboard_rounded,
+                          text: 'Dashboard',
+                          isSelected: currentIndex == 0,
+                          onTap: () => _onItemTapped(context, ref, 0),
+                        ),
+                      if (listsEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: Icons.list_alt_rounded,
+                          text: 'Minhas Listas',
+                          isSelected: currentIndex == 1,
+                          onTap: () => _onItemTapped(context, ref, 1),
+                        ),
+                      if (historyEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: Icons.history_rounded,
+                          text: 'Histórico',
+                          isSelected: currentIndex == 2,
+                          onTap: () => _onItemTapped(context, ref, 2),
+                        ),
+                      if (statsEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: isPremium ? Icons.bar_chart_rounded : Icons.lock_outline,
+                          text: 'Estatísticas',
+                          isSelected: currentIndex == 3,
+                          onTap: () {
+                            if (isPremium) {
+                              _onItemTapped(context, ref, 3);
+                            } else {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Funcionalidade Premium!')),
+                              );
+                            }
+                          },
+                        ),
+
+                      if (categoriesEnabled || settingsEnabled)
+                        Divider(
+                            color: scheme.outlineVariant.withOpacity(0.3),
+                            height: 16),
+
+                      if (categoriesEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: Icons.format_list_bulleted_rounded,
+                          text: 'Categorias',
+                          onTap: () => _navigateTo(context, const CategoriesScreen()),
+                        ),
+                      if (settingsEnabled)
+                        _buildDrawerItem(
+                          context,
+                          icon: Icons.settings_rounded,
+                          text: 'Configurações',
+                          onTap: () => _navigateTo(context, const SettingsScreen()),
+                        ),
+
+                      const Divider(
+                          color: Colors.white24,
                           height: 16),
                       _buildDrawerItem(
                         context,
@@ -119,7 +133,6 @@ class CustomDrawer extends ConsumerWidget {
                         text: 'Sair',
                         onTap: () async {
                           Navigator.pop(context);
-
                           final bool? confirm = await showGlassDialog<bool>(
                             context: context,
                             title: Row(
@@ -145,7 +158,6 @@ class CustomDrawer extends ConsumerWidget {
                               ),
                             ],
                           );
-
                           if (confirm == true) {
                             ref.read(authViewModelProvider.notifier).signOut();
                           }
@@ -154,7 +166,7 @@ class CustomDrawer extends ConsumerWidget {
                     ],
                   ),
                 ),
-                _ThemeToggle(isDark: isDark),
+                if (themeToggleEnabled) _ThemeToggle(isDark: isDark),
               ],
             ),
           ),
@@ -181,13 +193,10 @@ class CustomDrawer extends ConsumerWidget {
         required IconData icon,
         required String text,
         required GestureTapCallback onTap,
-        int? itemIndex,
-        int currentIndex = -1,
+        bool isSelected = false,
       }) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isSelected = itemIndex != null && itemIndex == currentIndex;
-
     const selectedColor = Color(0xFF1565C0);
 
     return ListTile(

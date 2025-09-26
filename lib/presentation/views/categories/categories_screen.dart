@@ -1,4 +1,5 @@
 // lib/presentation/views/categories/categories_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +19,10 @@ class CategoriesScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
 
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final addCategoryEnabled = remoteConfig.isAddCategoryEnabled;
+    final pullToRefreshEnabled = remoteConfig.isCategoriesPullToRefreshEnabled;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -26,7 +31,7 @@ class CategoriesScreen extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          const AppBackground(),
+          AppBackground(),
           SafeArea(
             child: categoriesAsync.when(
               loading: () => const _LoadingState(),
@@ -38,8 +43,9 @@ class CategoriesScreen extends ConsumerWidget {
                   );
                 }
                 return RefreshIndicator(
-                  onRefresh: () =>
-                      ref.read(categoriesViewModelProvider.notifier).loadCategories(),
+                  onRefresh: pullToRefreshEnabled
+                      ? () => ref.read(categoriesViewModelProvider.notifier).loadCategories()
+                      : () async {},
                   child: GridView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -66,20 +72,17 @@ class CategoriesScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: addCategoryEnabled ? FloatingActionButton(
         onPressed: () => _showAddOrEditCategoryDialog(context, ref),
         backgroundColor: scheme.secondary,
         foregroundColor: scheme.onSecondary,
         heroTag: 'add_category_fab',
         child: const Icon(Icons.add),
-      ),
+      ) : null,
     );
   }
 
-  // Dialogs =========
-
   void _showAddOrEditCategoryDialog(BuildContext context, WidgetRef ref, {Category? category}) {
-    // Reaproveita o mesmo diálogo para criar/editar
     final formKey = GlobalKey<_CategoryFormContentState>();
 
     showGlassDialog<void>(
@@ -96,7 +99,6 @@ class CategoriesScreen extends ConsumerWidget {
       ),
       content: _CategoryFormContent(key: formKey, category: category),
       actions: [
-        // ATENÇÃO: Na janela de Editar NÃO há botão Excluir
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
@@ -160,7 +162,6 @@ class CategoriesScreen extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(content: Text('Categoria "${category.name}" excluída.')),
       );
-      // Fecha o diálogo de edição se estiver aberto
       if (navigator.canPop()) navigator.pop();
     }
   }
@@ -192,7 +193,6 @@ class _CategoryCard extends StatelessWidget {
         child: GlassCard(
           child: Stack(
             children: [
-              // Conteúdo clicável central
               Positioned.fill(
                 child: Material(
                   color: Colors.transparent,
@@ -250,8 +250,6 @@ class _CategoryCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Botão de 3 pontinhos no canto superior direito
               Positioned(
                 top: 4,
                 right: 4,
@@ -268,7 +266,7 @@ class _CategoryCard extends StatelessWidget {
   }
 }
 
-class _CategoryCardMenu extends StatelessWidget {
+class _CategoryCardMenu extends ConsumerWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -278,8 +276,16 @@ class _CategoryCardMenu extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final editEnabled = remoteConfig.isEditCategoryEnabled;
+    final deleteEnabled = remoteConfig.isDeleteCategoryEnabled;
+
+    if (!editEnabled && !deleteEnabled) {
+      return const SizedBox.shrink(); // Esconde o menu se nenhuma ação estiver habilitada
+    }
+
     return PopupMenuButton<_MenuChoice>(
       tooltip: 'Mais opções',
       position: PopupMenuPosition.under,
@@ -297,28 +303,34 @@ class _CategoryCardMenu extends StatelessWidget {
             break;
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem<_MenuChoice>(
-          value: _MenuChoice.editar,
-          child: Row(
-            children: [
-              Icon(Icons.edit_rounded),
-              SizedBox(width: 12),
-              Text('Editar'),
-            ],
-          ),
-        ),
-        PopupMenuItem<_MenuChoice>(
-          value: _MenuChoice.excluir,
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, color: Colors.red),
-              SizedBox(width: 12),
-              Text('Excluir'),
-            ],
-          ),
-        ),
-      ],
+      itemBuilder: (context) {
+        final List<PopupMenuEntry<_MenuChoice>> items = [];
+        if (editEnabled) {
+          items.add(const PopupMenuItem<_MenuChoice>(
+            value: _MenuChoice.editar,
+            child: Row(
+              children: [
+                Icon(Icons.edit_rounded),
+                SizedBox(width: 12),
+                Text('Editar'),
+              ],
+            ),
+          ));
+        }
+        if (deleteEnabled) {
+          items.add(const PopupMenuItem<_MenuChoice>(
+            value: _MenuChoice.excluir,
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, color: Colors.red),
+                SizedBox(width: 12),
+                Text('Excluir'),
+              ],
+            ),
+          ));
+        }
+        return items;
+      },
     );
   }
 }
@@ -353,9 +365,7 @@ class _CategoryFormContentState extends ConsumerState<_CategoryFormContent> {
     super.dispose();
   }
 
-  // Métodos públicos chamados pelas actions do diálogo
   Future<void> save() => _onSave();
-  Future<void> delete() => _onDelete();
 
   Future<void> _onSave() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -377,47 +387,6 @@ class _CategoryFormContentState extends ConsumerState<_CategoryFormContent> {
       SnackBar(content: Text('Categoria "$name" salva com sucesso!')),
     );
     navigator.pop();
-  }
-
-  Future<void> _onDelete() async {
-    if (!isEditMode) return;
-
-    final viewModel = ref.read(categoriesViewModelProvider.notifier);
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-
-    final bool? confirm = await showGlassDialog<bool>(
-      context: context,
-      title: const Text('Confirmar Exclusão'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Tem certeza que deseja excluir a categoria "${widget.category!.name}"?'),
-          const SizedBox(height: 8),
-          const Text(
-            'Todos os itens associados a ela serão movidos para "Outros".',
-            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text('Excluir'),
-        )
-      ],
-    );
-
-    if (confirm == true) {
-      await viewModel.deleteCategory(widget.category!.id);
-      HapticFeedback.mediumImpact();
-      messenger.showSnackBar(
-        SnackBar(content: Text('Categoria "${widget.category!.name}" excluída.')),
-      );
-      navigator.pop();
-    }
   }
 
   @override
@@ -493,13 +462,15 @@ class _LoadingState extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   final VoidCallback onAdd;
   const _EmptyState({required this.onAdd});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final addCategoryEnabled = ref.watch(remoteConfigServiceProvider).isAddCategoryEnabled;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -520,16 +491,17 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('Criar Categoria'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: scheme.secondary,
-                foregroundColor: scheme.onSecondary,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            )
+            if (addCategoryEnabled)
+              ElevatedButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add),
+                label: const Text('Criar Categoria'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: scheme.secondary,
+                  foregroundColor: scheme.onSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              )
           ],
         ),
       ),

@@ -33,18 +33,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   Future<void> _checkVersion() async {
     if (!mounted) return;
-
     final remoteConfigService = ref.read(remoteConfigServiceProvider);
     await remoteConfigService.initialize();
-
     if (!mounted) return;
-
     final packageInfo = await ref.read(packageInfoProvider.future);
     final currentBuildNumber = int.parse(packageInfo.buildNumber);
-
     final minVersion = remoteConfigService.minSupportedVersionCode;
     final latestVersion = remoteConfigService.latestVersionCode;
-
     if (currentBuildNumber < minVersion) {
       if (mounted) _showUpdateDialog(isMandatory: true);
     } else if (currentBuildNumber < latestVersion) {
@@ -54,11 +49,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   void _showUpdateDialog({required bool isMandatory}) {
     if (!mounted) return;
-
-    final remoteConfigService = ref.read(remoteConfigServiceProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     showDialog(
       context: context,
       barrierDismissible: !isMandatory,
@@ -67,62 +59,53 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           canPop: !isMandatory,
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: AlertDialog(
-              backgroundColor: (isDark ? theme.colorScheme.surface : Colors.white)
-                  .withAlpha((255 * 0.85).toInt()),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: Colors.white.withOpacity(0.2)),
-              ),
-              title: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isMandatory ? Icons.system_update_alt_rounded : Icons.info_outline_rounded,
-                      color: theme.colorScheme.secondary,
+            child: Consumer(
+                builder: (context, ref, child) {
+                  final remoteConfigService = ref.read(remoteConfigServiceProvider);
+                  return AlertDialog(
+                    backgroundColor: (isDark ? theme.colorScheme.surface : Colors.white)
+                        .withAlpha((255 * 0.85).toInt()),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
                     ),
-                    const SizedBox(width: 12),
-                    Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
-                  ],
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: <Widget>[
-                    Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
-                    const SizedBox(height: 16),
-                    const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
-                  ],
-                ),
-              ),
-              // Organizando os botões lado a lado
-              actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              actions: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    if (!isMandatory)
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                    title: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isMandatory ? Icons.system_update_alt_rounded : Icons.info_outline_rounded,
+                            color: theme.colorScheme.secondary,
                           ),
+                          const SizedBox(width: 12),
+                          Text(isMandatory ? 'Atualização Obrigatória' : 'Nova Versão Disponível'),
+                        ],
+                      ),
+                    ),
+                    content: SingleChildScrollView(
+                      child: ListBody(
+                        children: <Widget>[
+                          Text('Uma nova versão (${remoteConfigService.latestVersionName}) do Superlistas está disponível!'),
+                          const SizedBox(height: 16),
+                          const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(remoteConfigService.releaseNotes.replaceAll('\\n', '\n')),
+                        ],
+                      ),
+                    ),
+                    actionsAlignment: MainAxisAlignment.end,
+                    actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    actions: <Widget>[
+                      if (!isMandatory)
+                        TextButton(
+                          style: TextButton.styleFrom(foregroundColor: Colors.blue.shade700),
                           child: const Text('Depois'),
                           onPressed: () => Navigator.of(dialogContext).pop(),
                         ),
-                      ),
-                    if (!isMandatory) const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
+                      ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isMandatory ? Colors.red : Colors.teal,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: const Text('Atualizar Agora'),
                         onPressed: () async {
@@ -132,17 +115,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           }
                         },
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  );
+                }
             ),
           ),
         );
       },
     );
   }
-
 
   static const List<Widget> _pages = <Widget>[
     HomeScreen(),
@@ -161,8 +142,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final remoteConfigService = ref.watch(remoteConfigServiceProvider);
-    final isPremium = remoteConfigService.isPremiumStatsEnabled;
+    final isPremium = ref.watch(remoteConfigServiceProvider).isPremiumStatsEnabled;
 
     return Scaffold(
       key: scaffoldKey,
@@ -174,11 +154,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             index: selectedIndex,
             children: _pages,
           ),
-          Positioned(
+          const Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _MainBottomNavBar(isPremium: isPremium),
+            child: _MainBottomNavBar(),
           ),
         ],
       ),
@@ -188,31 +168,32 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   Widget? _buildFloatingActionButton(BuildContext context, WidgetRef ref, int index, String userId) {
-    switch (index) {
-      case 1: // Tela de Minhas Listas
-        return Container(
-          margin: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewPadding.bottom + 80,
+    final addListEnabled = ref.watch(remoteConfigServiceProvider).isAddListEnabled;
+    if (!addListEnabled) return null;
+
+    // O índice da tela de listas é sempre 1 no IndexedStack fixo
+    if (index == 1) {
+      return Container(
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewPadding.bottom + 80,
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => showAddOrEditListDialog(
+            context: context,
+            ref: ref,
+            userId: userId,
           ),
-          child: FloatingActionButton.extended(
-            onPressed: () => showAddOrEditListDialog(
-              context: context,
-              ref: ref,
-              userId: userId,
-            ),
-            label: const Text('Nova Lista'),
-            icon: const Icon(Icons.add),
-          ),
-        );
-      default:
-        return null;
+          label: const Text('Nova Lista'),
+          icon: const Icon(Icons.add),
+        ),
+      );
     }
+    return null;
   }
 }
 
 class _MainBottomNavBar extends ConsumerWidget {
-  final bool isPremium;
-  const _MainBottomNavBar({required this.isPremium});
+  const _MainBottomNavBar();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -221,7 +202,24 @@ class _MainBottomNavBar extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    return ClipRect(
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final dashboardEnabled = remoteConfig.isDashboardScreenEnabled;
+    final listsEnabled = remoteConfig.isShoppingListsScreenEnabled;
+    final historyEnabled = remoteConfig.isHistoryScreenEnabled;
+    final statsEnabled = remoteConfig.isStatsScreenEnabled;
+    final isPremium = remoteConfig.isPremiumStatsEnabled;
+
+    final List<BottomNavigationBarItem> visibleItems = [];
+    if (dashboardEnabled) visibleItems.add(const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'));
+    if (listsEnabled) visibleItems.add(const BottomNavigationBarItem(icon: Icon(Icons.list_alt_rounded), label: 'Listas'));
+    if (historyEnabled) visibleItems.add(const BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'Histórico'));
+    if (statsEnabled) visibleItems.add(BottomNavigationBarItem(icon: Icon(isPremium ? Icons.bar_chart_rounded : Icons.lock_outline), label: 'Estatísticas'));
+
+    if (visibleItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: SafeArea(
@@ -241,31 +239,24 @@ class _MainBottomNavBar extends ConsumerWidget {
                   Colors.white.withAlpha((255 * 0.4).toInt()),
                 ],
               ),
-              border: Border(
-                top: BorderSide(
-                  color: scheme.onSurface.withOpacity(0.08),
-                  width: 1.5,
-                ),
-              ),
+              border: Border(top: BorderSide(color: scheme.onSurface.withOpacity(0.08), width: 1.5)),
             ),
             child: BottomNavigationBar(
-              items: <BottomNavigationBarItem>[
-                const BottomNavigationBarItem(
-                    icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-                const BottomNavigationBarItem(
-                    icon: Icon(Icons.list_alt_rounded), label: 'Listas'),
-                const BottomNavigationBarItem(
-                    icon: Icon(Icons.history_rounded), label: 'Histórico'),
-                BottomNavigationBarItem(
-                  icon: Icon(
-                    isPremium ? Icons.bar_chart_rounded : Icons.lock_outline,
-                  ),
-                  label: 'Estatísticas',
-                ),
-              ],
+              items: visibleItems,
               currentIndex: selectedIndex,
-              onTap: (index) {
-                if (index == 3 && !isPremium) {
+              onTap: (tappedIndex) {
+                // Mapeia o índice clicado (da lista visível) para o índice real do IndexedStack
+                final Map<int, int> visibleIndexToRealIndexMap = {};
+                int currentVisibleIndex = 0;
+                if(dashboardEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 0; }
+                if(listsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 1; }
+                if(historyEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 2; }
+                if(statsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 3; }
+
+                final realIndex = visibleIndexToRealIndexMap[tappedIndex];
+                if (realIndex == null) return;
+
+                if (realIndex == 3 && !isPremium) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Funcionalidade Premium!')),
                   );
@@ -273,10 +264,10 @@ class _MainBottomNavBar extends ConsumerWidget {
                 }
 
                 final user = ref.read(authViewModelProvider.notifier).currentUser;
-                if (index == 0 && user != null) {
+                if (realIndex == 0 && user != null) {
                   ref.invalidate(dashboardViewModelProvider(user.id));
                 }
-                ref.read(mainScreenIndexProvider.notifier).state = index;
+                ref.read(mainScreenIndexProvider.notifier).state = realIndex;
               },
               showUnselectedLabels: true,
               type: BottomNavigationBarType.fixed,

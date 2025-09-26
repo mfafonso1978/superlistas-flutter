@@ -21,6 +21,13 @@ class SettingsScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final themeMode = ref.watch(themeModeProvider);
 
+    // Lendo todas as flags relevantes para esta tela
+    final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final themeToggleEnabled = remoteConfig.isThemeToggleEnabled;
+    final backgroundSelectEnabled = remoteConfig.isBackgroundSelectEnabled;
+    final unitsScreenEnabled = remoteConfig.isUnitsScreenEnabled;
+    final importExportEnabled = remoteConfig.isImportExportEnabled;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -34,74 +41,89 @@ class SettingsScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                GlassCard(
-                  child: Column(
-                    children: [
-                      SwitchListTile.adaptive(
-                        secondary:
-                        Icon(Icons.dark_mode_rounded, color: scheme.secondary),
-                        title: const Text('Tema escuro'),
-                        subtitle: const Text('Alterne entre claro e escuro'),
-                        value: themeMode == ThemeMode.dark,
-                        onChanged: (v) {
-                          ref.read(themeModeProvider.notifier).setMode(
-                            v ? ThemeMode.dark : ThemeMode.light,
-                          );
-                        },
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      ListTile(
-                        leading: Icon(Icons.image_outlined, color: scheme.secondary),
-                        title: const Text('Gerenciar plano de fundo'),
-                        subtitle: const Text('Escolha a imagem principal do app'),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const BackgroundSelectionScreen()),
-                          );
-                        },
-                      ),
-                    ],
+                // Card de Aparência (só aparece se uma de suas opções estiver habilitada)
+                if (themeToggleEnabled || backgroundSelectEnabled) ...[
+                  GlassCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (themeToggleEnabled)
+                          SwitchListTile.adaptive(
+                            secondary: Icon(Icons.dark_mode_rounded, color: scheme.secondary),
+                            title: const Text('Tema escuro'),
+                            subtitle: const Text('Alterne entre claro e escuro'),
+                            value: themeMode == ThemeMode.dark,
+                            onChanged: (v) {
+                              ref.read(themeModeProvider.notifier).setMode(
+                                v ? ThemeMode.dark : ThemeMode.light,
+                              );
+                            },
+                          ),
+                        if (themeToggleEnabled && backgroundSelectEnabled)
+                          const Divider(height: 1, indent: 16, endIndent: 16),
+                        if (backgroundSelectEnabled)
+                          ListTile(
+                            leading: Icon(Icons.image_outlined, color: scheme.secondary),
+                            title: const Text('Gerenciar plano de fundo'),
+                            subtitle: const Text('Escolha a imagem principal do app'),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const BackgroundSelectionScreen()),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                GlassCard(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: Icon(Icons.straighten_rounded, color: scheme.secondary),
-                        title: const Text('Gerenciar Unidades'),
-                        subtitle: const Text('Adicione ou remova unidades de medida'),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const UnitsScreen()),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      ListTile(
-                        leading: Icon(Icons.file_upload_rounded,
-                            color: scheme.secondary),
-                        title: const Text('Exportar dados (Backup)'),
-                        subtitle: const Text(
-                            'Salva todas as suas listas e itens em um arquivo'),
-                        onTap: () => _exportarDados(context, ref),
-                      ),
-                      const Divider(
-                        height: 1,
-                        indent: 16,
-                        endIndent: 16,
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.file_download_rounded,
-                            color: scheme.secondary),
-                        title: const Text('Importar dados (Restaurar)'),
-                        subtitle: const Text(
-                            'Substitui os dados atuais a partir de um arquivo'),
-                        onTap: () => _importarDados(context, ref),
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                ],
+
+                // Card de Dados (só aparece se uma de suas opções estiver habilitada)
+                if (unitsScreenEnabled || importExportEnabled) ...[
+                  GlassCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (unitsScreenEnabled)
+                          ListTile(
+                            leading: Icon(Icons.straighten_rounded, color: scheme.secondary),
+                            title: const Text('Gerenciar Unidades'),
+                            subtitle: const Text('Adicione ou remova unidades de medida'),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const UnitsScreen()),
+                              );
+                            },
+                          ),
+                        if (unitsScreenEnabled && importExportEnabled)
+                          const Divider(height: 1, indent: 16, endIndent: 16),
+                        if (importExportEnabled) ...[
+                          ListTile(
+                            leading: Icon(Icons.file_upload_rounded,
+                                color: scheme.secondary),
+                            title: const Text('Exportar dados (Backup)'),
+                            subtitle: const Text(
+                                'Salva todas as suas listas e itens em um arquivo'),
+                            onTap: () => _exportarDados(context, ref),
+                          ),
+                          const Divider(
+                            height: 1,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
+                          ListTile(
+                            leading: Icon(Icons.file_download_rounded,
+                                color: scheme.secondary),
+                            title: const Text('Importar dados (Restaurar)'),
+                            subtitle: const Text(
+                                'Substitui os dados atuais a partir de um arquivo'),
+                            onTap: () => _importarDados(context, ref),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
