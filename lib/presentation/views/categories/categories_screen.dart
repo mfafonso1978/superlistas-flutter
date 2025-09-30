@@ -103,7 +103,6 @@ class CategoriesScreen extends ConsumerWidget {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        const SizedBox(width: 8),
         ElevatedButton(
           onPressed: () => formKey.currentState?.save(),
           child: const Text('Salvar'),
@@ -124,8 +123,8 @@ class CategoriesScreen extends ConsumerWidget {
 
     final bool? confirm = await showGlassDialog<bool>(
       context: context,
-      title: Row(
-        children: const [
+      title: const Row(
+        children: [
           Icon(Icons.delete_forever_rounded, color: Colors.red),
           SizedBox(width: 12),
           Text('Excluir Categoria'),
@@ -147,7 +146,6 @@ class CategoriesScreen extends ConsumerWidget {
           onPressed: () => navigator.pop(false),
           child: const Text('Cancelar'),
         ),
-        const SizedBox(width: 8),
         ElevatedButton(
           onPressed: () => navigator.pop(true),
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -283,7 +281,7 @@ class _CategoryCardMenu extends ConsumerWidget {
     final deleteEnabled = remoteConfig.isDeleteCategoryEnabled;
 
     if (!editEnabled && !deleteEnabled) {
-      return const SizedBox.shrink(); // Esconde o menu se nenhuma ação estiver habilitada
+      return const SizedBox.shrink();
     }
 
     return PopupMenuButton<_MenuChoice>(

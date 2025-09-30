@@ -7,11 +7,17 @@ import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/categories/categories_screen.dart';
+import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 import 'package:superlistas/presentation/views/settings/settings_screen.dart';
 
+void _showPremiumUpsell(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const PremiumScreen()),
+  );
+}
+
 class CustomDrawer extends ConsumerWidget {
-  final bool isPremium;
-  const CustomDrawer({super.key, required this.isPremium});
+  const CustomDrawer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,6 +27,8 @@ class CustomDrawer extends ConsumerWidget {
     final user = ref.watch(authViewModelProvider);
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final isPremium = remoteConfig.isUserPremium;
+
     final dashboardEnabled = remoteConfig.isDashboardScreenEnabled;
     final listsEnabled = remoteConfig.isShoppingListsScreenEnabled;
     final historyEnabled = remoteConfig.isHistoryScreenEnabled;
@@ -93,13 +101,11 @@ class CustomDrawer extends ConsumerWidget {
                           text: 'Estatísticas',
                           isSelected: currentIndex == 3,
                           onTap: () {
+                            Navigator.pop(context);
                             if (isPremium) {
                               _onItemTapped(context, ref, 3);
                             } else {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Funcionalidade Premium!')),
-                              );
+                              _showPremiumUpsell(context);
                             }
                           },
                         ),
@@ -177,7 +183,6 @@ class CustomDrawer extends ConsumerWidget {
 
   void _onItemTapped(BuildContext context, WidgetRef ref, int index) {
     ref.read(mainScreenIndexProvider.notifier).state = index;
-    Navigator.pop(context);
   }
 
   void _navigateTo(BuildContext context, Widget page) {

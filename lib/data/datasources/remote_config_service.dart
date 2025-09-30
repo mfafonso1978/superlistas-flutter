@@ -27,7 +27,7 @@ class RemoteConfigService {
     'action_delete_list_enabled': true,
     'action_archive_list_enabled': true,
     'shopping_lists_pull_to_refresh_enabled': true,
-    'screen_list_items_enabled': true, // Assumindo que a tela de itens pode ser controlada
+    'screen_list_items_enabled': true,
     'action_add_item_enabled': true,
     'action_edit_item_enabled': true,
     'action_delete_item_enabled': true,
@@ -54,9 +54,11 @@ class RemoteConfigService {
     'feature_theme_toggle_enabled': true,
     'feature_background_select_enabled': true,
     'feature_import_export_enabled': true,
-    'action_duplicate_list_enabled': true, // Adicionado dos mapeamentos anteriores
-    'feature_templates_enabled': true, // Adicionado dos mapeamentos anteriores
-    'premium_stats_enabled': false,
+    'action_duplicate_list_enabled': true,
+    'feature_templates_enabled': true,
+    'feature_cloud_sync_enabled': true,
+    // <<< MUDANÇA: FLAG RENOMEADA PARA UM PROPÓSITO GERAL >>>
+    'is_user_premium': false,
   };
 
   Future<void> initialize() async {
@@ -74,15 +76,17 @@ class RemoteConfigService {
     }
   }
 
+  bool get isCloudSyncEnabled => _remoteConfig.getBool('feature_cloud_sync_enabled');
+
+  // <<< MUDANÇA: GETTER ATUALIZADO >>>
+  bool get isUserPremium => _remoteConfig.getBool('is_user_premium');
+
   // Versioning
   int get minSupportedVersionCode => _remoteConfig.getInt('min_supported_version_code');
   int get latestVersionCode => _remoteConfig.getInt('latest_version_code');
   String get latestVersionName => _remoteConfig.getString('latest_version_name');
   String get updateUrl => _remoteConfig.getString('update_url');
   String get releaseNotes => _remoteConfig.getString('release_notes');
-
-  // Premium
-  bool get isPremiumStatsEnabled => _remoteConfig.getBool('premium_stats_enabled');
 
   // Screens
   bool get isDashboardScreenEnabled => _remoteConfig.getBool('screen_dashboard_enabled');

@@ -52,7 +52,7 @@ class ShoppingListsScreen extends ConsumerWidget {
     }
 
     final userId = currentUser.id;
-    final shoppingListsAsync = ref.watch(shoppingListsViewModelProvider(userId));
+    final shoppingListsAsync = ref.watch(shoppingListsStreamProvider(userId));
 
     final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isShoppingListsPullToRefreshEnabled;
 
@@ -62,9 +62,10 @@ class ShoppingListsScreen extends ConsumerWidget {
         children: [
           const Positioned.fill(child: _ShoppingListsBackground()),
           RefreshIndicator(
-            onRefresh: pullToRefreshEnabled
-                ? () => ref.read(shoppingListsViewModelProvider(userId).notifier).loadLists()
-                : () async {},
+            onRefresh: () async {
+              ref.invalidate(shoppingListsStreamProvider(userId));
+              await Future.delayed(const Duration(milliseconds: 500));
+            },
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
@@ -361,7 +362,7 @@ class _ShoppingListItem extends ConsumerWidget {
                 ),
               ),
             ).then((_) {
-              ref.invalidate(shoppingListsViewModelProvider(userId));
+              ref.invalidate(shoppingListsStreamProvider(userId));
               ref.invalidate(historyViewModelProvider(userId));
               ref.invalidate(dashboardViewModelProvider(userId));
             });
@@ -506,14 +507,12 @@ class _ShoppingListItem extends ConsumerWidget {
       ),
     );
 
-    // Se nenhuma ação de deslizar estiver habilitada, retorna apenas o card.
     if (!editEnabled && !deleteEnabled) {
       return cardContent;
     }
 
     return Dismissible(
       key: Key(list.id),
-      // CORREÇÃO: Usamos um Container vazio como placeholder se a direção estiver desabilitada
       background: editEnabled
           ? Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
@@ -522,7 +521,7 @@ class _ShoppingListItem extends ConsumerWidget {
         alignment: Alignment.centerLeft,
         child: const Icon(Icons.edit, color: Colors.white),
       )
-          : Container(color: Colors.transparent), // Placeholder
+          : Container(color: Colors.transparent),
       secondaryBackground: deleteEnabled
           ? Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
@@ -531,7 +530,7 @@ class _ShoppingListItem extends ConsumerWidget {
         alignment: Alignment.centerRight,
         child: const Icon(Icons.delete_forever, color: Colors.white),
       )
-          : null, // Pode ser null se o background principal existir
+          : null,
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.endToStart && deleteEnabled) {
           final shouldDelete = await _showDeleteConfirmationDialog(context, ref, list);

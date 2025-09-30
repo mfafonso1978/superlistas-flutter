@@ -10,6 +10,7 @@ import 'package:superlistas/domain/entities/item.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/main/main_screen.dart';
+import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 
 final historyListItemsProvider =
 FutureProvider.autoDispose.family<List<Item>, String>((ref, listId) {
@@ -17,6 +18,12 @@ FutureProvider.autoDispose.family<List<Item>, String>((ref, listId) {
   return repository.getItems(listId);
 });
 
+
+void _showPremiumUpsell(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const PremiumScreen()),
+  );
+}
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -88,17 +95,17 @@ class HistoryScreen extends ConsumerWidget {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-            scheme.surface.withOpacity(0.6),
-            scheme.surface.withOpacity(0.4),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
+            scheme.surface.withAlpha((255 * 0.4).toInt()),
           ]
               : [
-            Colors.white.withOpacity(0.7),
-            Colors.white.withOpacity(0.5),
+            Colors.white.withAlpha((255 * 0.7).toInt()),
+            Colors.white.withAlpha((255 * 0.5).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withAlpha((255 * 0.2).toInt()),
           width: 1,
         ),
       ),
@@ -194,6 +201,7 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
     if (currentUser == null) return const SizedBox.shrink();
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final isPremium = remoteConfig.isUserPremium;
     final viewItemsEnabled = remoteConfig.isHistoryViewItemsEnabled;
     final reuseListEnabled = remoteConfig.isReuseListEnabled;
     final deleteHistoryEnabled = remoteConfig.isDeleteHistoryListEnabled;
@@ -212,17 +220,17 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-            scheme.surface.withOpacity(0.6),
-            scheme.surface.withOpacity(0.4),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
+            scheme.surface.withAlpha((255 * 0.4).toInt()),
           ]
               : [
-            Colors.white.withOpacity(0.7),
-            Colors.white.withOpacity(0.5),
+            Colors.white.withAlpha((255 * 0.7).toInt()),
+            Colors.white.withAlpha((255 * 0.5).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withAlpha((255 * 0.2).toInt()),
           width: 1,
         ),
       ),
@@ -270,24 +278,27 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                         icon: Icon(Icons.more_vert, color: scheme.onSurface),
                         onSelected: (value) async {
                           if (value == 'reuse') {
-                            await ref
-                                .read(historyViewModelProvider(userId).notifier)
-                                .reuseList(widget.list);
-                            if (!context.mounted) return;
-                            ref.invalidate(shoppingListsViewModelProvider(userId));
+                            if (isPremium) {
+                              await ref
+                                  .read(historyViewModelProvider(userId).notifier)
+                                  .reuseList(widget.list);
+                              if (!context.mounted) return;
+                              ref.invalidate(shoppingListsViewModelProvider(userId));
 
-                            // Lógica para ir para a aba de listas
-                            int listsTabIndex = 1;
-                            if (ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled == false) {
-                              listsTabIndex = 0;
+                              int listsTabIndex = 1;
+                              if (ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled == false) {
+                                listsTabIndex = 0;
+                              }
+                              ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        'Lista "${widget.list.name}" reutilizada com sucesso!')),
+                              );
+                            } else {
+                              _showPremiumUpsell(context);
                             }
-                            ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      'Lista "${widget.list.name}" reutilizada com sucesso!')),
-                            );
                           } else if (value == 'delete') {
                             final bool? shouldDelete = await showGlassDialog<bool>(
                               context: context,
@@ -322,14 +333,39 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                           }
                         },
                         itemBuilder: (BuildContext context) {
+                          final theme = Theme.of(context);
+                          final iconColor = theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
+
                           final List<PopupMenuEntry<String>> items = [];
                           if (reuseListEnabled) {
-                            items.add(const PopupMenuItem<String>(
-                                value: 'reuse', child: Text('Reutilizar Lista')));
+                            items.add(PopupMenuItem<String>(
+                              value: 'reuse',
+                              child: IconTheme(
+                                data: IconThemeData(color: iconColor),
+                                child: Row(
+                                  children: [
+                                    Icon(isPremium ? Icons.copy_all_rounded : Icons.lock_outline),
+                                    const SizedBox(width: 12),
+                                    const Text('Reutilizar Lista'),
+                                  ],
+                                ),
+                              ),
+                            ));
                           }
                           if (deleteHistoryEnabled) {
-                            items.add(const PopupMenuItem<String>(
-                                value: 'delete', child: Text('Excluir Permanente')));
+                            items.add(PopupMenuItem<String>(
+                              value: 'delete',
+                              child: IconTheme(
+                                data: const IconThemeData(color: Colors.red),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.delete_forever_outlined),
+                                    SizedBox(width: 12),
+                                    Text('Excluir Permanente'),
+                                  ],
+                                ),
+                              ),
+                            ));
                           }
                           return items;
                         },
@@ -354,11 +390,11 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final itemColor = isDark ? Colors.white70 : scheme.onSurface.withOpacity(0.8);
-    final subItemColor = isDark ? Colors.white54 : scheme.onSurfaceVariant.withOpacity(0.8);
+    final itemColor = isDark ? Colors.white70 : scheme.onSurface.withAlpha((255 * 0.8).toInt());
+    final subItemColor = isDark ? Colors.white54 : scheme.onSurfaceVariant.withAlpha((255 * 0.8).toInt());
 
     return Container(
-      color: (isDark ? Colors.black : Colors.white).withOpacity(0.1),
+      color: (isDark ? Colors.black : Colors.white).withAlpha((255 * 0.1).toInt()),
       child: itemsAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.all(16.0),
@@ -382,7 +418,7 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
             separatorBuilder: (context, index) => Divider(
               height: 1,
               thickness: 1,
-              color: (isDark ? Colors.white : scheme.primary).withOpacity(0.1),
+              color: (isDark ? Colors.white : scheme.primary).withAlpha((255 * 0.1).toInt()),
               indent: 16,
               endIndent: 16,
             ),

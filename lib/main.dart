@@ -5,24 +5,15 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:superlistas/core/ui/theme/app_theme.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/splash/splash_screen.dart';
-
-// <<< 1. IMPORTS DO FIREBASE >>>
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // Arquivo gerado pela FlutterFire CLI
+import 'firebase_options.dart';
 
 void main() async {
-  // <<< 2. GARANTIR A INICIALIZAÇÃO DOS BINDINGS (JÁ EXISTENTE) >>>
   WidgetsFlutterBinding.ensureInitialized();
-
-  // <<< 3. INICIALIZAR O FIREBASE >>>
-  // Isso lê o arquivo firebase_options.dart e configura a comunicação.
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // <<< 4. O RESTO DO SEU CÓDIGO (JÁ EXISTENTE) >>>
   await initializeDateFormatting('pt_BR', null);
-
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -31,6 +22,9 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Inicia o ouvinte de conectividade para o ciclo de vida do app.
+    ref.watch(connectivityListenerProvider);
+
     final mode = ref.watch(themeModeProvider);
 
     return MaterialApp(

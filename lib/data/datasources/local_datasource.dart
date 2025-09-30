@@ -4,6 +4,7 @@ import 'package:superlistas/core/database/database_helper.dart';
 import 'package:superlistas/data/models/category_model.dart';
 import 'package:superlistas/data/models/item_model.dart';
 import 'package:superlistas/data/models/shopping_list_model.dart';
+import 'package:superlistas/data/models/sync_operation_model.dart';
 import 'package:superlistas/data/models/user_model.dart';
 
 abstract class LocalDataSource {
@@ -27,6 +28,7 @@ abstract class LocalDataSource {
   Future<ShoppingListModel?> getShoppingListById(String id);
   Future<int> updateShoppingList(ShoppingListModel shoppingList);
   Future<int> deleteShoppingList(String id);
+  Future<void> deleteAllShoppingListsForUser(String userId);
 
   // --- Métodos para Itens ---
   Future<void> addItem(ItemModel item);
@@ -39,15 +41,23 @@ abstract class LocalDataSource {
   Future<double> getTotalCostOfList(String shoppingListId);
   Future<List<ItemModel>> getAllItemsForUser(String userId);
   Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(String userId);
+  Future<void> deleteAllItemsFromList(String shoppingListId);
 
-  // --- Métodos de Importação/Exportação ---
+  // --- Métodos de Importação/Exportação e Sincronização ---
   Future<void> performImport(String userId, Map<String, dynamic> data);
+  Future<Map<String, dynamic>> getAllDataForUser(String userId);
+  Future<void> deleteAllUserData(String userId);
 
   // --- Métodos para Unidades ---
   Future<List<String>> getAllUnits();
   Future<void> addUnit(String name);
   Future<int> deleteUnit(String name);
   Future<int> updateUnit(String oldName, String newName);
+
+  // --- Métodos para a Fila de Sincronização ---
+  Future<void> addToSyncQueue(SyncOperationModel operation);
+  Future<List<SyncOperationModel>> getPendingSyncOperations(String userId);
+  Future<void> removeSyncOperation(int id);
 }
 
 class LocalDataSourceImpl implements LocalDataSource {
@@ -231,6 +241,32 @@ class LocalDataSourceImpl implements LocalDataSource {
   }
 
   @override
+  Future<void> deleteAllShoppingListsForUser(String userId) async {
+    final db = await databaseHelper.database;
+    final userLists = await db.query(
+      DatabaseHelper.tableShoppingLists,
+      where: 'userId = ?',
+      whereArgs: [userId],
+      columns: ['id'],
+    );
+    if (userLists.isNotEmpty) {
+      final listIds = userLists.map((row) => row['id'] as String).toList();
+      final batch = db.batch();
+      batch.delete(
+        DatabaseHelper.tableItems,
+        where: 'shoppingListId IN (${List.filled(listIds.length, '?').join(',')})',
+        whereArgs: listIds,
+      );
+      batch.delete(
+        DatabaseHelper.tableShoppingLists,
+        where: 'id IN (${List.filled(listIds.length, '?').join(',')})',
+        whereArgs: listIds,
+      );
+      await batch.commit(noResult: true);
+    }
+  }
+
+  @override
   Future<void> addItem(ItemModel item) async {
     final db = await databaseHelper.database;
     await db.insert(
@@ -365,6 +401,16 @@ class LocalDataSourceImpl implements LocalDataSource {
   }
 
   @override
+  Future<void> deleteAllItemsFromList(String shoppingListId) async {
+    final db = await databaseHelper.database;
+    await db.delete(
+      DatabaseHelper.tableItems,
+      where: 'shoppingListId = ?',
+      whereArgs: [shoppingListId],
+    );
+  }
+
+  @override
   Future<void> performImport(String userId, Map<String, dynamic> data) async {
     final db = await databaseHelper.database;
 
@@ -419,6 +465,40 @@ class LocalDataSourceImpl implements LocalDataSource {
   }
 
   @override
+  Future<Map<String, dynamic>> getAllDataForUser(String userId) async {
+    final shoppingLists = await getAllShoppingListsForUser(userId);
+    final items = await getAllItemsForUser(userId);
+    final categories = await getAllCategories();
+    final units = await getAllUnits();
+
+    return {
+      'shopping_lists': shoppingLists,
+      'items': items,
+      'categories': categories,
+      'units': units,
+    };
+  }
+
+  @override
+  Future<void> deleteAllUserData(String userId) async {
+    final db = await databaseHelper.database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      batch.delete(
+        DatabaseHelper.tableShoppingLists,
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      batch.delete(
+        DatabaseHelper.tableSyncQueue,
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      await batch.commit(noResult: true);
+    });
+  }
+
+  @override
   Future<List<String>> getAllUnits() async {
     final db = await databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.query(DatabaseHelper.tableUnits);
@@ -453,6 +533,34 @@ class LocalDataSourceImpl implements LocalDataSource {
       {'name': newName},
       where: 'name = ?',
       whereArgs: [oldName],
+    );
+  }
+
+  @override
+  Future<void> addToSyncQueue(SyncOperationModel operation) async {
+    final db = await databaseHelper.database;
+    await db.insert(DatabaseHelper.tableSyncQueue, operation.toMap());
+  }
+
+  @override
+  Future<List<SyncOperationModel>> getPendingSyncOperations(String userId) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseHelper.tableSyncQueue,
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'timestamp ASC',
+    );
+    return maps.map((map) => SyncOperationModel.fromMap(map)).toList();
+  }
+
+  @override
+  Future<void> removeSyncOperation(int id) async {
+    final db = await databaseHelper.database;
+    await db.delete(
+      DatabaseHelper.tableSyncQueue,
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }

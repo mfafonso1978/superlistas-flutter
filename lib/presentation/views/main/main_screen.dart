@@ -7,6 +7,7 @@ import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/history/history_screen.dart';
 import 'package:superlistas/presentation/views/home/home_screen.dart';
+import 'package:superlistas/presentation/views/premium/premium_screen.dart'; // <<< NOVO IMPORT
 import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart';
 import 'package:superlistas/presentation/views/stats/stats_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,6 +15,13 @@ import 'package:url_launcher/url_launcher.dart';
 final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
 });
+
+// Helper para navegação
+void _showPremiumUpsell(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const PremiumScreen()),
+  );
+}
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -67,7 +75,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         .withAlpha((255 * 0.85).toInt()),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      side: BorderSide(color: Colors.white.withAlpha((255 * 0.2).toInt())),
                     ),
                     title: FittedBox(
                       fit: BoxFit.scaleDown,
@@ -142,11 +150,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final isPremium = ref.watch(remoteConfigServiceProvider).isPremiumStatsEnabled;
-
     return Scaffold(
       key: scaffoldKey,
-      drawer: CustomDrawer(isPremium: isPremium),
+      drawer: const CustomDrawer(),
       extendBody: true,
       body: Stack(
         children: [
@@ -171,7 +177,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final addListEnabled = ref.watch(remoteConfigServiceProvider).isAddListEnabled;
     if (!addListEnabled) return null;
 
-    // O índice da tela de listas é sempre 1 no IndexedStack fixo
     if (index == 1) {
       return Container(
         margin: EdgeInsets.only(
@@ -207,7 +212,7 @@ class _MainBottomNavBar extends ConsumerWidget {
     final listsEnabled = remoteConfig.isShoppingListsScreenEnabled;
     final historyEnabled = remoteConfig.isHistoryScreenEnabled;
     final statsEnabled = remoteConfig.isStatsScreenEnabled;
-    final isPremium = remoteConfig.isPremiumStatsEnabled;
+    final isPremium = remoteConfig.isUserPremium;
 
     final List<BottomNavigationBarItem> visibleItems = [];
     if (dashboardEnabled) visibleItems.add(const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'));
@@ -239,13 +244,12 @@ class _MainBottomNavBar extends ConsumerWidget {
                   Colors.white.withAlpha((255 * 0.4).toInt()),
                 ],
               ),
-              border: Border(top: BorderSide(color: scheme.onSurface.withOpacity(0.08), width: 1.5)),
+              border: Border(top: BorderSide(color: scheme.onSurface.withAlpha((255 * 0.08).toInt()), width: 1.5)),
             ),
             child: BottomNavigationBar(
               items: visibleItems,
               currentIndex: selectedIndex,
               onTap: (tappedIndex) {
-                // Mapeia o índice clicado (da lista visível) para o índice real do IndexedStack
                 final Map<int, int> visibleIndexToRealIndexMap = {};
                 int currentVisibleIndex = 0;
                 if(dashboardEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 0; }
@@ -257,9 +261,8 @@ class _MainBottomNavBar extends ConsumerWidget {
                 if (realIndex == null) return;
 
                 if (realIndex == 3 && !isPremium) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Funcionalidade Premium!')),
-                  );
+                  // <<< CORREÇÃO APLICADA AQUI >>>
+                  _showPremiumUpsell(context);
                   return;
                 }
 
@@ -274,7 +277,7 @@ class _MainBottomNavBar extends ConsumerWidget {
               backgroundColor: Colors.transparent,
               elevation: 0,
               selectedItemColor: const Color(0xFF1565C0),
-              unselectedItemColor: scheme.onSurface.withOpacity(0.6),
+              unselectedItemColor: scheme.onSurface.withAlpha((255 * 0.6).toInt()),
             ),
           ),
         ),

@@ -10,18 +10,17 @@ class AuthWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Agora o watch retorna um objeto User? diretamente.
     final authUser = ref.watch(authViewModelProvider);
 
-    // Se não há usuário (é nulo), mostramos a tela de login.
     if (authUser == null) {
       return const LoginScreen();
-    }
-    // Se há um usuário, mostramos a tela principal.
-    else {
+    } else {
+      // Assim que o usuário está logado, tentamos processar operações pendentes.
+      Future.microtask(() {
+        ref.read(shoppingListRepositoryProvider).processSyncQueue(authUser.id);
+      });
+
       return const MainScreen();
     }
-    // O estado de loading inicial é gerenciado pela SplashScreen,
-    // então não precisamos de um indicador de progresso aqui.
   }
 }

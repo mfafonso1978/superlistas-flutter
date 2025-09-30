@@ -14,10 +14,17 @@ import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/viewmodels/list_items_viewmodel.dart';
 import 'package:superlistas/presentation/views/list_items/list_analysis_screen.dart';
+import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 
 final unitsProvider = FutureProvider.autoDispose<List<String>>((ref) {
   return ref.watch(shoppingListRepositoryProvider).getAllUnits();
 });
+
+void _showPremiumUpsell(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const PremiumScreen()),
+  );
+}
 
 class ListItemsScreen extends ConsumerWidget {
   final String shoppingListId;
@@ -92,8 +99,7 @@ class ListItemsScreen extends ConsumerWidget {
           appBar: AppBar(),
           body: Center(child: Text('Erro ao carregar a lista: $err'))),
       data: (shoppingList) {
-        final itemsAsync =
-        ref.watch(listItemsViewModelProvider(shoppingList.id));
+        final itemsAsync = ref.watch(listItemsStreamProvider(shoppingList.id));
         final viewModel =
         ref.read(listItemsViewModelProvider(shoppingList.id).notifier);
 
@@ -379,6 +385,7 @@ class _ItemsSliverAppBar extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
+    final isPremium = remoteConfig.isUserPremium;
     final archiveEnabled = remoteConfig.isArchiveListEnabled;
     final editListEnabled = remoteConfig.isEditListEnabled;
     final analysisEnabled = remoteConfig.isListAnalysisScreenEnabled;
@@ -455,32 +462,67 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                   list: shoppingList,
                 );
               } else if (value == 'analysis') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          ListAnalysisScreen(shoppingList: shoppingList)),
-                );
+                if (isPremium) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            ListAnalysisScreen(shoppingList: shoppingList)),
+                  );
+                } else {
+                  _showPremiumUpsell(context);
+                }
               }
             },
             itemBuilder: (BuildContext context) {
+              final theme = Theme.of(context);
+              final iconColor = theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
+
               final List<PopupMenuEntry<String>> menuItems = [];
               if (archiveEnabled) {
                 menuItems.add(PopupMenuItem<String>(
                   value: 'complete',
                   enabled: isConcludeEnabled,
-                  child: const Text('Concluir compra'),
+                  child: IconTheme(
+                    data: IconThemeData(color: iconColor),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.archive_outlined),
+                        SizedBox(width: 12),
+                        Text('Concluir compra'),
+                      ],
+                    ),
+                  ),
                 ));
               }
               if (editListEnabled) {
-                menuItems.add(const PopupMenuItem<String>(
+                menuItems.add(PopupMenuItem<String>(
                   value: 'edit',
-                  child: Text('Editar Lista'),
+                  child: IconTheme(
+                    data: IconThemeData(color: iconColor),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.edit_outlined),
+                        SizedBox(width: 12),
+                        Text('Editar Lista'),
+                      ],
+                    ),
+                  ),
                 ));
               }
               if (analysisEnabled) {
-                menuItems.add(const PopupMenuItem<String>(
-                    value: 'analysis', child: Text('Análise da Lista')));
+                menuItems.add(PopupMenuItem<String>(
+                    value: 'analysis',
+                    child: IconTheme(
+                      data: IconThemeData(color: iconColor),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.analytics_outlined),
+                          SizedBox(width: 12),
+                          Text('Análise da Lista'),
+                        ],
+                      ),
+                    )));
               }
               return menuItems;
             },
@@ -777,7 +819,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                         units.insert(0, _selectedUnit);
                       }
                       return DropdownButtonFormField<String>(
-                        value: _selectedUnit,
+                        initialValue: _selectedUnit,
                         decoration: const InputDecoration(labelText: 'Unidade'),
                         items: units
                             .map((unit) =>
@@ -799,7 +841,7 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                         categories.add(_selectedCategory!);
                       }
                       return DropdownButtonFormField<Category>(
-                        value: _selectedCategory,
+                        initialValue: _selectedCategory,
                         decoration: const InputDecoration(labelText: 'Categoria'),
                         isExpanded: true,
                         items: categories.map((category) {

@@ -6,14 +6,14 @@ import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   static const _databaseName = "Superlistas.db";
-  // <<< MUDANÇA 1: ATUALIZAR A VERSÃO DO BANCO DE DADOS >>>
-  static const _databaseVersion = 7;
+  static const _databaseVersion = 8; // VERSÃO INCREMENTADA
 
   static const String tableUsers = 'users';
   static const String tableCategories = 'categories';
   static const String tableShoppingLists = 'shopping_lists';
   static const String tableItems = 'items';
   static const String tableUnits = 'units';
+  static const String tableSyncQueue = 'sync_queue'; // NOVA TABELA
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
@@ -52,7 +52,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         iconCodePoint INTEGER NOT NULL,
-        colorValue INTEGER NOT NULL  -- <<< MUDANÇA 2: Adicionado no CREATE
+        colorValue INTEGER NOT NULL
       )
     ''');
 
@@ -91,6 +91,18 @@ class DatabaseHelper {
       )
     ''');
 
+    batch.execute('''
+      CREATE TABLE $tableSyncQueue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        entityType TEXT NOT NULL,
+        entityId TEXT NOT NULL,
+        operationType TEXT NOT NULL,
+        payload TEXT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
     await batch.commit(noResult: true);
 
     await _seedDatabase(db);
@@ -126,11 +138,22 @@ class DatabaseHelper {
       ''');
       await _seedUnits(db);
     }
-    // <<< MUDANÇA 3: NOVA MIGRAÇÃO >>>
     if (oldVersion < 7) {
       await db.execute('ALTER TABLE $tableCategories ADD COLUMN colorValue INTEGER NOT NULL DEFAULT ${Colors.grey.value}');
-      // Opcional: Atualizar as categorias existentes com cores únicas
       await _updateExistingCategoryColors(db);
+    }
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE $tableSyncQueue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          entityType TEXT NOT NULL,
+          entityId TEXT NOT NULL,
+          operationType TEXT NOT NULL,
+          payload TEXT,
+          timestamp TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -139,7 +162,6 @@ class DatabaseHelper {
     await _seedUnits(db);
   }
 
-  // <<< MUDANÇA 4: Gerador de cores e lista de cores base >>>
   static const List<Color> _baseColors = [
     Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFF9C27B0),
     Color(0xFFF44336), Color(0xFF00BCD4), Color(0xFF795548), Color(0xFF607D8B),
@@ -171,7 +193,7 @@ class DatabaseHelper {
         'id': uuid.v4(),
         'name': cat['name'],
         'iconCodePoint': (cat['icon'] as IconData).codePoint,
-        'colorValue': _getColorForIndex(i).value, // <<< MUDANÇA 5: Adiciona cor no seed
+        'colorValue': _getColorForIndex(i).value,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
@@ -186,7 +208,6 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
-  // <<< MUDANÇA 6: Novo método para atualizar cores de categorias antigas na migração >>>
   Future<void> _updateExistingCategoryColors(Database db) async {
     final categories = await db.query(tableCategories, columns: ['id']);
     final batch = db.batch();

@@ -14,35 +14,32 @@ Future<T?> showGlassDialog<T>({
   double minHeight = 200.0,
   double maxWidth = 320.0,
   double minWidth = 260.0,
-  EdgeInsets cardInsets =
-  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+  EdgeInsets cardInsets = const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
   double cardBorderRadius = 24.0,
   double blurSigma = 10.0,
   double backgroundAlphaLight = 0.85,
-  double backgroundAlphaDark  = 0.80,
+  double backgroundAlphaDark = 0.80,
   double topSafeExtra = 12.0,
-  double bottomSafe  = 20.0,
+  double bottomSafe = 20.0,
   bool centerTitle = true,
   double titleFontSize = 24.0,
   FontWeight titleFontWeight = FontWeight.w700,
   Color? titleColor,
   Color titleColorLight = Colors.black,
-  Color titleColorDark  = Colors.white,
-  EdgeInsets titlePadding =
-  const EdgeInsets.fromLTRB(16, 0, 16, 0),
+  Color titleColorDark = Colors.white,
+  EdgeInsets titlePadding = const EdgeInsets.fromLTRB(16, 0, 16, 0),
   double titleBottomGap = 28.0,
   double titleIconSize = 42.0,
   Color titleIconColor = Colors.black54,
-  EdgeInsets contentPadding =
-  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-  EdgeInsets actionsPadding =
-  const EdgeInsets.fromLTRB(16, 12, 16, 16),
+  EdgeInsets contentPadding = const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+  EdgeInsets actionsPadding = const EdgeInsets.fromLTRB(16, 12, 16, 16),
   bool actionsHorizontal = true,
   double actionsGap = 12.0,
   double actionHeight = 44.0,
   double actionRadius = 12.0,
-  Color cancelColor = Colors.blue,
-  Color saveColor   = Colors.teal,
+  // ALTERAÇÃO 1: Cores dos botões agora são opcionais (nuláveis) e não têm valor padrão fixo.
+  Color? cancelColor,
+  Color? saveColor,
   Color actionTextColor = Colors.white,
   bool swapActionsOrder = false,
 }) {
@@ -60,12 +57,12 @@ Future<T?> showGlassDialog<T>({
     builder: (context) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final media  = MediaQuery.of(context);
-          final theme  = Theme.of(context);
+          final media = MediaQuery.of(context);
+          final theme = Theme.of(context);
           final scheme = theme.colorScheme;
 
-          final screenH   = constraints.maxHeight;
-          final keyboard  = media.viewInsets.bottom;
+          final screenH = constraints.maxHeight;
+          final keyboard = media.viewInsets.bottom;
           final availableH = screenH - cardInsets.vertical;
 
           final targetH = math.max(
@@ -88,8 +85,7 @@ Future<T?> showGlassDialog<T>({
               .withAlpha((255 * (isDark ? backgroundAlphaDark : backgroundAlphaLight)).toInt());
 
           Widget buildTitle(Widget child) {
-            final Color effectiveTitleColor =
-                titleColor ?? (isDark ? titleColorDark : titleColorLight);
+            final Color effectiveTitleColor = titleColor ?? (isDark ? titleColorDark : titleColorLight);
 
             final styled = DefaultTextStyle(
               style: TextStyle(
@@ -112,16 +108,18 @@ Future<T?> showGlassDialog<T>({
           }
 
           VoidCallback? extractOnPressed(Widget w) {
-            if (w is TextButton)     return w.onPressed;
+            if (w is TextButton) return w.onPressed;
             if (w is ElevatedButton) return w.onPressed;
             if (w is OutlinedButton) return w.onPressed;
+            if (w is FilledButton) return w.onPressed;
             return null;
           }
 
           Widget extractChild(Widget w) {
-            if (w is TextButton)     return w.child ?? const SizedBox.shrink();
+            if (w is TextButton) return w.child ?? const SizedBox.shrink();
             if (w is ElevatedButton) return w.child ?? const SizedBox.shrink();
             if (w is OutlinedButton) return w.child ?? const SizedBox.shrink();
+            if (w is FilledButton) return w.child ?? const SizedBox.shrink();
             return w;
           }
 
@@ -140,7 +138,9 @@ Future<T?> showGlassDialog<T>({
               child: InkWell(
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(actionRadius),
-                child: Center(
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
                       color: actionTextColor,
@@ -156,15 +156,19 @@ Future<T?> showGlassDialog<T>({
             );
           }
 
+          // ALTERAÇÃO 2: A função `buildActionsBar` foi reescrita para usar as cores do tema.
           Widget buildActionsBar(List<Widget> actsRaw) {
             final acts = normalizeActions(actsRaw);
+            // Pega o ColorScheme do tema atual
+            final scheme = Theme.of(context).colorScheme;
 
             if (acts.length == 1) {
               final action = acts.first;
               return SizedBox(
                 height: actionHeight,
                 child: coloredAction(
-                  color: saveColor,
+                  // Usa a cor passada, ou a cor secundária (teal) do tema como padrão
+                  color: saveColor ?? scheme.secondary,
                   child: extractChild(action),
                   onTap: extractOnPressed(action),
                 ),
@@ -172,7 +176,7 @@ Future<T?> showGlassDialog<T>({
             }
 
             if (actionsHorizontal && acts.length == 2) {
-              final left  = swapActionsOrder ? acts[1] : acts[0];
+              final left = swapActionsOrder ? acts[1] : acts[0];
               final right = swapActionsOrder ? acts[0] : acts[1];
               return Row(
                 children: [
@@ -180,7 +184,8 @@ Future<T?> showGlassDialog<T>({
                     child: SizedBox(
                       height: actionHeight,
                       child: coloredAction(
-                        color: cancelColor,
+                        // Usa a cor passada, ou um azul padrão para o "cancelar"
+                        color: cancelColor ?? Colors.blue.shade700,
                         child: extractChild(left),
                         onTap: extractOnPressed(left),
                       ),
@@ -191,7 +196,8 @@ Future<T?> showGlassDialog<T>({
                     child: SizedBox(
                       height: actionHeight,
                       child: coloredAction(
-                        color: saveColor,
+                        // Usa a cor passada, ou a cor secundária (teal) do tema para o "salvar"
+                        color: saveColor ?? scheme.secondary,
                         child: extractChild(right),
                         onTap: extractOnPressed(right),
                       ),
@@ -250,8 +256,7 @@ Future<T?> showGlassDialog<T>({
                             contentPadding: contentPadding,
                             scrollable: true,
                             content: DefaultTextStyle(
-                              style: theme.dialogTheme.contentTextStyle ??
-                                  theme.textTheme.bodyMedium!,
+                              style: theme.dialogTheme.contentTextStyle ?? theme.textTheme.bodyMedium!,
                               child: content,
                             ),
                             actionsPadding: actionsPadding,
