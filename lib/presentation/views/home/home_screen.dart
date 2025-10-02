@@ -11,8 +11,8 @@ import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
+import 'package:superlistas/presentation/views/main/main_screen.dart';
 
-const double _kHomeAppBarHeight = kToolbarHeight + 64;
 
 double _contentBottomInset(BuildContext context) =>
     MediaQuery.of(context).viewPadding.bottom + 80;
@@ -43,7 +43,7 @@ class HomeBackground extends ConsumerWidget {
         ),
         Positioned.fill(
           child: ColoredBox(
-            color: Colors.black.withOpacity(isDark ? 0.35 : 0.15),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.35 : 0.15)).toInt()),
           ),
         ),
       ],
@@ -64,195 +64,233 @@ class HomeScreen extends ConsumerWidget {
 
     final userId = user.id;
 
-    ref.listen<AsyncValue<List<ShoppingList>>>(
-      shoppingListsViewModelProvider(userId),
-          (prev, next) {
-        if (next.hasValue || next.hasError) {
-          ref.read(dashboardViewModelProvider(userId).notifier).loadData();
-        }
-      },
-    );
-
     final dashboardDataAsync = ref.watch(dashboardViewModelProvider(userId));
     final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isDashboardPullToRefreshEnabled;
 
-    return Stack(
-      children: [
-        const Positioned.fill(child: HomeBackground()),
-        RefreshIndicator(
-          onRefresh: pullToRefreshEnabled
-              ? () => ref.read(dashboardViewModelProvider(userId).notifier).loadData()
-              : () async {},
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              _DashboardSliverAppBar(user: user),
-              ...dashboardDataAsync.when(
-                loading: () => _buildLoadingSlivers(context),
-                error: (err, _) => _buildErrorSlivers('$err'),
-                data: (data) => _buildDataSlivers(
-                  context: context,
-                  ref: ref,
-                  userId: userId,
-                  data: data,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: HomeBackground()),
+          RefreshIndicator(
+            onRefresh: pullToRefreshEnabled
+                ? () => ref.read(dashboardViewModelProvider(userId).notifier).loadData()
+                : () async {},
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                _DashboardSliverAppBar(user: user),
+                ...dashboardDataAsync.when(
+                  loading: () => _buildLoadingSlivers(context),
+                  error: (err, _) => _buildErrorSlivers('$err'),
+                  data: (data) => _buildDataSlivers(
+                    context: context,
+                    ref: ref,
+                    userId: userId,
+                    data: data,
+                  ),
                 ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.only(bottom: _contentBottomInset(context)),
-              ),
-            ],
+                SliverPadding(
+                  padding: EdgeInsets.only(bottom: _contentBottomInset(context)),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _DashboardSliverAppBar extends StatelessWidget {
+
+// #############################################################################
+// EFEITO PARALLAX COM DRAWER FUNCIONAL
+// - AppBar encolhe suavemente ao rolar
+// - Drawer abre corretamente usando mainScaffoldKeyProvider
+// - Cores sólidas: branco (claro) e #344049 (escuro)
+// #############################################################################
+class _DashboardSliverAppBar extends ConsumerWidget {
   final User user;
   const _DashboardSliverAppBar({required this.user});
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final today =
     DateFormat('EEEE, d \'de\' MMMM', 'pt_BR').format(DateTime.now());
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Altura expandida e colapsada
+    const double expandedHeight = kToolbarHeight + 64;
+    const double collapsedHeight = kToolbarHeight;
 
     return SliverAppBar(
       pinned: true,
       floating: false,
       snap: false,
-      expandedHeight: _kHomeAppBarHeight,
-      collapsedHeight: _kHomeAppBarHeight,
+      expandedHeight: expandedHeight,
+      collapsedHeight: collapsedHeight,
       backgroundColor: Colors.transparent,
       leading: IconButton(
         icon: Icon(Icons.menu, color: scheme.onSurface),
         onPressed: () {
-          Scaffold.of(context).openDrawer();
+          // Usa o GlobalKey do MainScreen para abrir o drawer correto
+          final scaffoldKey = ref.read(mainScaffoldKeyProvider);
+          scaffoldKey.currentState?.openDrawer();
         },
+        tooltip: 'Menu',
       ),
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                  scheme.primary.withOpacity(0.80),
-                  scheme.primary.withOpacity(0.70),
-                ]
-                    : [
-                  Colors.white.withOpacity(0.6),
-                  Colors.white.withOpacity(0.4),
-                ],
-              ),
-              border: Border(
-                bottom: BorderSide(
-                  color: scheme.onSurface.withOpacity(0.08),
-                  width: 1,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          // Calcular o progresso do encolhimento
+          final double statusBarHeight = MediaQuery.of(context).padding.top;
+          final double maxHeight = expandedHeight + statusBarHeight;
+          final double minHeight = collapsedHeight + statusBarHeight;
+          final double currentHeight = constraints.maxHeight;
+
+          // shrinkProgress: 0.0 = totalmente expandido, 1.0 = totalmente colapsado
+          final double shrinkProgress =
+          ((maxHeight - currentHeight) / (maxHeight - minHeight))
+              .clamp(0.0, 1.0);
+
+          // Opacidade da data (desaparece suavemente ao encolher)
+          final double dateOpacity = (1.0 - shrinkProgress).clamp(0.0, 1.0);
+
+          // Ajuste de espaçamento vertical baseado no encolhimento
+          final double topPadding = 8.0 - (shrinkProgress * 6.0);
+          final double bottomPadding = 10.0 - (shrinkProgress * 8.0);
+
+          // Espaçamento entre saudação e data (reduz ao encolher)
+          final double textSpacing = 4.0 * (1.0 - shrinkProgress);
+
+          return ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF344049)
+                      : Colors.white,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: scheme.onSurface.withAlpha((255 * 0.08).toInt()),
+                      width: 1,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(60, 8, 16, 10),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Olá, ${user.name} 👋',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: scheme.onSurface,
-                                  letterSpacing: -0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(60, topPadding, 16, bottomPadding),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.centerLeft,
+                              maxHeight: double.infinity,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Saudação - sempre visível com tamanho fixo
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Olá, ${user.name} 👋',
+                                      style: theme.textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: scheme.onSurface,
+                                        letterSpacing: -0.5,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.clip,
+                                    ),
+                                  ),
+                                  // Espaçamento dinâmico
+                                  if (textSpacing > 0.1)
+                                    SizedBox(height: textSpacing),
+                                  // Data - desaparece gradualmente ao encolher
+                                  if (dateOpacity > 0.01)
+                                    Opacity(
+                                      opacity: dateOpacity,
+                                      child: Text(
+                                        today[0].toUpperCase() + today.substring(1),
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: scheme.onSurface
+                                              .withAlpha((255 * 0.8).toInt()),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.clip,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              today[0].toUpperCase() + today.substring(1),
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: scheme.onSurface.withOpacity(0.8),
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Avatar - sempre visível
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: scheme.secondary.withAlpha(50),
+                          child: user.photoUrl == null
+                              ? Text(
+                            user.name.isNotEmpty
+                                ? user.name[0].toUpperCase()
+                                : 'U',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: scheme.secondary,
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: scheme.secondary.withOpacity(0.2),
-                        child: user.photoUrl == null
-                            ? Text(
-                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: scheme.secondary,
-                          ),
-                        )
-                            : ClipOval(
-                          child: Image.network(
-                            user.photoUrl!,
-                            fit: BoxFit.cover,
-                            width: 52,
-                            height: 52,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.person,
-                                color: scheme.secondary,
-                                size: 30,
-                              );
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              );
-                            },
+                          )
+                              : ClipOval(
+                            child: Image.network(
+                              user.photoUrl!,
+                              fit: BoxFit.cover,
+                              width: 52,
+                              height: 52,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.person,
+                                  color: scheme.secondary,
+                                  size: 30,
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                        : null,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
+
 
 List<Widget> _buildDataSlivers({
   required BuildContext context,
@@ -362,7 +400,7 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
     SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverToBoxAdapter(child: const _ShimmerBox(h: 24, r: 8, w: 160)),
+      sliver: const SliverToBoxAdapter(child: _ShimmerBox(h: 24, r: 8, w: 160)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
     SliverToBoxAdapter(
@@ -380,7 +418,7 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
     SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverToBoxAdapter(child: const _ShimmerBox(h: 24, r: 8, w: 180)),
+      sliver: const SliverToBoxAdapter(child: _ShimmerBox(h: 24, r: 8, w: 180)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
     SliverToBoxAdapter(
@@ -422,9 +460,9 @@ class _ShimmerBox extends StatelessWidget {
         gradient: LinearGradient(
           colors: isDark
               ? [
-            scheme.surfaceContainerHighest.withOpacity(0.5),
-            scheme.surfaceContainerHighest.withOpacity(0.3),
-            scheme.surfaceContainerHighest.withOpacity(0.5),
+            scheme.surfaceContainerHighest.withAlpha((255 * 0.5).toInt()),
+            scheme.surfaceContainerHighest.withAlpha((255 * 0.3).toInt()),
+            scheme.surfaceContainerHighest.withAlpha((255 * 0.5).toInt()),
           ]
               : [
             Colors.grey.shade200,
@@ -470,24 +508,24 @@ class _MetricCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-            scheme.surface.withOpacity(0.8),
-            scheme.surface.withOpacity(0.6),
+            scheme.surface.withAlpha((255 * 0.8).toInt()),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
           ]
               : [
-            Colors.white.withOpacity(0.75),
-            Colors.white.withOpacity(0.55),
+            Colors.white.withAlpha((255 * 0.75).toInt()),
+            Colors.white.withAlpha((255 * 0.55).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark
-              ? scheme.outline.withOpacity(0.2)
-              : scheme.outline.withOpacity(0.1),
+              ? scheme.outline.withAlpha((255 * 0.2).toInt())
+              : scheme.outline.withAlpha((255 * 0.1).toInt()),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: data.gradient[0].withOpacity(0.1),
+            color: data.gradient[0].withAlpha((255 * 0.1).toInt()),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -514,7 +552,7 @@ class _MetricCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: data.gradient[0].withOpacity(0.3),
+                            color: data.gradient[0].withAlpha((255 * 0.3).toInt()),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -809,7 +847,7 @@ class _QuickActionCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: [
               scheme.secondary,
-              scheme.secondary.withOpacity(0.8),
+              scheme.secondary.withAlpha((255 * 0.8).toInt()),
             ],
           )
               : LinearGradient(
@@ -817,12 +855,12 @@ class _QuickActionCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: isDark
                 ? [
-              scheme.surface.withOpacity(0.8),
-              scheme.surface.withOpacity(0.6),
+              scheme.surface.withAlpha((255 * 0.8).toInt()),
+              scheme.surface.withAlpha((255 * 0.6).toInt()),
             ]
                 : [
-              Colors.white.withOpacity(0.75),
-              Colors.white.withOpacity(0.55),
+              Colors.white.withAlpha((255 * 0.75).toInt()),
+              Colors.white.withAlpha((255 * 0.55).toInt()),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
@@ -830,15 +868,15 @@ class _QuickActionCard extends StatelessWidget {
             color: action.isPrimary
                 ? Colors.transparent
                 : isDark
-                ? scheme.outline.withOpacity(0.2)
-                : scheme.outline.withOpacity(0.1),
+                ? scheme.outline.withAlpha((255 * 0.2).toInt())
+                : scheme.outline.withAlpha((255 * 0.1).toInt()),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
               color: action.isPrimary
-                  ? scheme.secondary.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.05),
+                  ? scheme.secondary.withAlpha((255 * 0.3).toInt())
+                  : Colors.black.withAlpha((255 * 0.05).toInt()),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -858,7 +896,7 @@ class _QuickActionCard extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: action.isPrimary
-                          ? Colors.white.withOpacity(0.2)
+                          ? Colors.white.withAlpha((255 * 0.2).toInt())
                           : scheme.secondary,
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -943,19 +981,19 @@ class _EmptyRecent extends ConsumerWidget {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-            scheme.surface.withOpacity(0.8),
-            scheme.surface.withOpacity(0.6),
+            scheme.surface.withAlpha((255 * 0.8).toInt()),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
           ]
               : [
-            Colors.white.withOpacity(0.75),
-            Colors.white.withOpacity(0.55),
+            Colors.white.withAlpha((255 * 0.75).toInt()),
+            Colors.white.withAlpha((255 * 0.55).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
-              ? scheme.outline.withOpacity(0.2)
-              : scheme.outline.withOpacity(0.1),
+              ? scheme.outline.withAlpha((255 * 0.2).toInt())
+              : scheme.outline.withAlpha((255 * 0.1).toInt()),
           width: 1,
         ),
       ),
@@ -966,7 +1004,7 @@ class _EmptyRecent extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: scheme.secondary.withOpacity(0.1),
+                color: scheme.secondary.withAlpha((255 * 0.1).toInt()),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
@@ -1063,24 +1101,24 @@ class _RecentListCard extends ConsumerWidget {
             end: Alignment.bottomRight,
             colors: isDark
                 ? [
-              scheme.surface.withOpacity(0.8),
-              scheme.surface.withOpacity(0.6),
+              scheme.surface.withAlpha((255 * 0.8).toInt()),
+              scheme.surface.withAlpha((255 * 0.6).toInt()),
             ]
                 : [
-              Colors.white.withOpacity(0.75),
-              Colors.white.withOpacity(0.55),
+              Colors.white.withAlpha((255 * 0.75).toInt()),
+              Colors.white.withAlpha((255 * 0.55).toInt()),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isDark
-                ? scheme.outline.withOpacity(0.2)
-                : scheme.outline.withOpacity(0.1),
+                ? scheme.outline.withAlpha((255 * 0.2).toInt())
+                : scheme.outline.withAlpha((255 * 0.1).toInt()),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withAlpha((255 * 0.05).toInt()),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -1189,7 +1227,7 @@ class _RecentListCard extends ConsumerWidget {
                           value: list.progress,
                           minHeight: 8,
                           backgroundColor:
-                          scheme.surfaceContainerHigh.withOpacity(0.3),
+                          scheme.surfaceContainerHigh.withAlpha((255 * 0.3).toInt()),
                           valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                         ),
                       ),
@@ -1212,8 +1250,8 @@ class _RecentListCard extends ConsumerWidget {
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? scheme.secondary.withOpacity(0.2)
-                                    : scheme.primary.withOpacity(0.1),
+                                    ? scheme.secondary.withAlpha((255 * 0.2).toInt())
+                                    : scheme.primary.withAlpha((255 * 0.1).toInt()),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -1285,9 +1323,9 @@ class _DashboardError extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: scheme.errorContainer.withOpacity(0.1),
+            color: scheme.errorContainer.withAlpha((255 * 0.1).toInt()),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: scheme.error.withOpacity(0.3)),
+            border: Border.all(color: scheme.error.withAlpha((255 * 0.3).toInt())),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

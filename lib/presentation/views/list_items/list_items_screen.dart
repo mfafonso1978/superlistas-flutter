@@ -41,14 +41,15 @@ class ListItemsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color glassColor = (isDark ? theme.colorScheme.surface : Colors.white).withAlpha((255 * 0.85).toInt());
+    final Color glassColor =
+    (isDark ? theme.colorScheme.surface : Colors.white).withAlpha((255 * 0.85).toInt());
 
     showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withAlpha((255 * 0.5).toInt()),
       builder: (sheetContext) {
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -157,7 +158,8 @@ class ListItemsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          floatingActionButton: addItemEnabled ? itemsAsync.when(
+          floatingActionButton: addItemEnabled
+              ? itemsAsync.when(
             data: (items) {
               final double totalCost =
               items.fold(0.0, (sum, item) => sum + item.subtotal);
@@ -177,13 +179,16 @@ class ListItemsScreen extends ConsumerWidget {
                   backgroundColor: budgetExceeded
                       ? Colors.grey
                       : Theme.of(context).colorScheme.secondary,
+                  // CORREÇÃO APLICADA AQUI
+                  shape: const CircleBorder(),
                   child: const Icon(Icons.add),
                 ),
               );
             },
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
-          ) : null,
+          )
+              : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         );
       },
@@ -229,7 +234,8 @@ class ListItemsScreen extends ConsumerWidget {
               Divider(
                 height: 1,
                 thickness: 1,
-                color: (isDark ? Colors.white : theme.colorScheme.primary).withAlpha((255 * 0.15).toInt()),
+                color: (isDark ? Colors.white : theme.colorScheme.primary)
+                    .withAlpha((255 * 0.15).toInt()),
                 indent: 16,
                 endIndent: 16,
               ),
@@ -243,8 +249,7 @@ class ListItemsScreen extends ConsumerWidget {
             iconColor: headerColor,
             collapsedIconColor: headerColor,
             initiallyExpanded: true,
-            leading:
-            Icon(categoryIcon, color: theme.colorScheme.secondary),
+            leading: Icon(categoryIcon, color: theme.colorScheme.secondary),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -264,12 +269,11 @@ class ListItemsScreen extends ConsumerWidget {
                       color: subHeaderColor,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withAlpha((255 * 0.6).toInt()),
                           blurRadius: 3,
-                          offset: const Offset(1,1),
+                          offset: const Offset(1, 1),
                         )
-                      ]
-                  ),
+                      ]),
                 ),
               ],
             ),
@@ -296,74 +300,85 @@ class ListItemsScreen extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color primaryColor = scheme.primary;
-    final itemTitleColor = isDark ? (item.isChecked ? Colors.white54 : Colors.white) : (item.isChecked ? primaryColor.withAlpha((255 * 0.5).toInt()) : primaryColor);
-    final itemSubtitleColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
-    final itemIconColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
+    final itemTitleColor = isDark
+        ? (item.isChecked ? Colors.white54 : Colors.white)
+        : (item.isChecked
+        ? primaryColor.withAlpha((255 * 0.5).toInt())
+        : primaryColor);
+    final itemSubtitleColor =
+    isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
+    final itemIconColor =
+    isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
 
-    return Consumer(
-        builder: (context, ref, child) {
-          final remoteConfig = ref.watch(remoteConfigServiceProvider);
-          final checkEnabled = remoteConfig.isCheckItemEnabled;
-          final editEnabled = remoteConfig.isEditItemEnabled;
-          final deleteEnabled = remoteConfig.isDeleteItemEnabled;
+    return Consumer(builder: (context, ref, child) {
+      final remoteConfig = ref.watch(remoteConfigServiceProvider);
+      final checkEnabled = remoteConfig.isCheckItemEnabled;
+      final editEnabled = remoteConfig.isEditItemEnabled;
+      final deleteEnabled = remoteConfig.isDeleteItemEnabled;
 
-          return Dismissible(
-            key: Key(item.id),
-            direction: deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
-            background: Container(
-              color: Colors.red,
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: const Icon(Icons.delete_forever, color: Colors.white),
+      return Dismissible(
+        key: Key(item.id),
+        direction:
+        deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
+        background: Container(
+          color: Colors.red,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: const Icon(Icons.delete_forever, color: Colors.white),
+        ),
+        onDismissed: (_) => viewModel.deleteItem(item.id),
+        child: CheckboxListTile(
+          activeColor: scheme.secondary,
+          checkColor: scheme.onSecondary,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: item.isChecked,
+          onChanged: checkEnabled
+              ? (bool? newValue) {
+            final updatedItem = item.copyWith(isChecked: newValue ?? false);
+            viewModel.updateItem(updatedItem);
+          }
+              : null,
+          title: Text(
+            item.name,
+            style: TextStyle(
+              decoration: item.isChecked
+                  ? TextDecoration.lineThrough
+                  : TextDecoration.none,
+              color: itemTitleColor,
+              fontWeight: FontWeight.bold,
             ),
-            onDismissed: (_) => viewModel.deleteItem(item.id),
-            child: CheckboxListTile(
-              activeColor: scheme.secondary,
-              checkColor: scheme.onSecondary,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: item.isChecked,
-              onChanged: checkEnabled ? (bool? newValue) {
-                final updatedItem = item.copyWith(isChecked: newValue ?? false);
-                viewModel.updateItem(updatedItem);
-              } : null,
-              title: Text(
-                item.name,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${quantityFormat.format(item.quantity)} ${item.unit}  •  ${currencyFormat.format(item.price)}/${item.unit}',
+                style: TextStyle(color: itemSubtitleColor),
+              ),
+              Text(
+                'Subtotal: ${currencyFormat.format(item.subtotal)}',
                 style: TextStyle(
-                  decoration:
-                  item.isChecked ? TextDecoration.lineThrough : TextDecoration.none,
-                  color: itemTitleColor,
-                  fontWeight: FontWeight.bold,
-                ),
+                    color: itemSubtitleColor, fontWeight: FontWeight.w500),
               ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${quantityFormat.format(item.quantity)} ${item.unit}  •  ${currencyFormat.format(item.price)}/${item.unit}',
-                    style: TextStyle(color: itemSubtitleColor),
-                  ),
-                  Text(
-                    'Subtotal: ${currencyFormat.format(item.subtotal)}',
-                    style: TextStyle(color: itemSubtitleColor, fontWeight: FontWeight.w500),
-                  ),
-                ],
+            ],
+          ),
+          secondary: editEnabled
+              ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.edit_outlined, color: itemIconColor),
+                onPressed: () {
+                  _showItemFormModal(context, ref, shoppingList,
+                      currentTotalCost: currentTotalCost, item: item);
+                },
               ),
-              secondary: editEnabled ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.edit_outlined, color: itemIconColor),
-                    onPressed: () {
-                      _showItemFormModal(context, ref, shoppingList,
-                          currentTotalCost: currentTotalCost, item: item);
-                    },
-                  ),
-                ],
-              ) : null,
-            ),
-          );
-        }
-    );
+            ],
+          )
+              : null,
+        ),
+      );
+    });
   }
 }
 
@@ -381,7 +396,6 @@ class _ItemsSliverAppBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
@@ -394,29 +408,25 @@ class _ItemsSliverAppBar extends ConsumerWidget {
     final bool isConcludeEnabled =
         archiveEnabled && checkedItemsCount > 0 && !shoppingList.isArchived;
 
-    final Color foregroundColor = isDark ? scheme.onSurface : Colors.white;
+    final Color foregroundColor = isDark ? Colors.white : Colors.black;
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
+    final baseFontSize = theme.textTheme.headlineSmall?.fontSize ?? 24.0;
+    final reducedFontSize = baseFontSize * 0.7;
 
     return SliverAppBar(
       pinned: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(50),
       iconTheme: IconThemeData(color: foregroundColor),
       actionsIconTheme: IconThemeData(color: foregroundColor),
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            color: isDark
-                ? scheme.surface.withAlpha((255 * 0.3).toInt())
-                : Colors.white.withAlpha((255 * 0.2).toInt()),
-          ),
-        ),
-      ),
+      backgroundColor: backgroundColor,
+      surfaceTintColor: backgroundColor,
       title: Text(
         shoppingList.name,
         style: theme.textTheme.headlineSmall?.copyWith(
           color: foregroundColor,
           fontWeight: FontWeight.w800,
+          fontSize: reducedFontSize,
         ),
         overflow: TextOverflow.ellipsis,
       ),
@@ -476,7 +486,8 @@ class _ItemsSliverAppBar extends ConsumerWidget {
             },
             itemBuilder: (BuildContext context) {
               final theme = Theme.of(context);
-              final iconColor = theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
+              final iconColor =
+              theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
 
               final List<PopupMenuEntry<String>> menuItems = [];
               if (archiveEnabled) {
@@ -544,6 +555,7 @@ class _FinancialSummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     final currencyFormat =
@@ -552,75 +564,95 @@ class _FinancialSummaryBar extends StatelessWidget {
         shoppingList.budget != null && shoppingList.budget! > 0;
     final double balance = hasBudget ? shoppingList.budget! - totalCost : 0.0;
 
-    const Color valueColor = Colors.white;
-    const Color labelColor = Colors.white70;
-    final Color balanceColor = balance >= 0
-        ? Colors.greenAccent.shade200
-        : Colors.redAccent.shade100;
+    final Color backgroundColor = isDark ? scheme.surfaceVariant : Colors.grey.shade100;
+    final Color labelColor = isDark ? Colors.white70 : Colors.black54;
+    final Color valueColor = isDark ? Colors.white : Colors.black;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          decoration: BoxDecoration(
-            color: Colors.black.withAlpha((255 * (isDark ? 0.2 : 0.1)).toInt()),
-            border: Border(
-                bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    Color balanceColor;
+    if (balance < 0) {
+      balanceColor = Colors.red;
+    } else if (hasBudget && shoppingList.budget! > 0 && balance <= shoppingList.budget! * 0.10) {
+      balanceColor = Colors.red;
+    } else {
+      balanceColor = scheme.secondary; // Teal
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border(
+            bottom: BorderSide(color: Colors.grey.withAlpha(80))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  const Text('Total',
+                  Icon(Icons.functions, size: 14, color: labelColor),
+                  const SizedBox(width: 4),
+                  Text('Total',
                       style: TextStyle(fontSize: 12, color: labelColor)),
-                  const SizedBox(height: 2),
-                  Text(
-                    currencyFormat.format(totalCost),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: valueColor),
-                  ),
                 ],
               ),
-              if (hasBudget)
-                Column(
-                  children: [
-                    const Text('Limite',
-                        style: TextStyle(fontSize: 12, color: labelColor)),
-                    const SizedBox(height: 2),
-                    Text(
-                      currencyFormat.format(shoppingList.budget),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: valueColor),
-                    ),
-                  ],
-                ),
-              if (hasBudget)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Saldo',
-                        style: TextStyle(fontSize: 12, color: labelColor)),
-                    const SizedBox(height: 2),
-                    Text(
-                      currencyFormat.format(balance),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: balanceColor,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 2),
+              Text(
+                currencyFormat.format(totalCost),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: valueColor),
+              ),
             ],
           ),
-        ),
+          if (hasBudget)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.credit_card_outlined, size: 14, color: labelColor),
+                    const SizedBox(width: 4),
+                    Text('Limite',
+                        style: TextStyle(fontSize: 12, color: labelColor)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  currencyFormat.format(shoppingList.budget),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: valueColor),
+                ),
+              ],
+            ),
+          if (hasBudget)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.wallet_outlined, size: 14, color: labelColor),
+                    const SizedBox(width: 4),
+                    Text('Saldo',
+                        style: TextStyle(fontSize: 12, color: labelColor)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  currencyFormat.format(balance),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: balanceColor,
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -773,7 +805,8 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Nome do Item'),
+                    decoration:
+                    const InputDecoration(labelText: 'Nome do Item'),
                     validator: (value) =>
                     value!.isEmpty ? 'Por favor, insira um nome' : null,
                   ),
@@ -784,8 +817,8 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                       Expanded(
                         child: TextFormField(
                           controller: _priceController,
-                          decoration:
-                          const InputDecoration(labelText: 'Preço', prefixText: 'R\$ '),
+                          decoration: const InputDecoration(
+                              labelText: 'Preço', prefixText: 'R\$ '),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -797,11 +830,13 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                       Expanded(
                         child: TextFormField(
                           controller: _quantityController,
-                          decoration: const InputDecoration(labelText: 'Quantidade'),
-                          keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                          decoration:
+                          const InputDecoration(labelText: 'Quantidade'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+[,.]?\d{0,3}'))
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+[,.]?\d{0,3}'))
                           ],
                         ),
                       ),
@@ -811,7 +846,8 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                   unitsAsync.when(
                     loading: () => const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20.0),
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      child:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
                     error: (err, _) => const Text('Erro ao carregar unidades'),
                     data: (units) {
@@ -819,19 +855,23 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                         units.insert(0, _selectedUnit);
                       }
                       return DropdownButtonFormField<String>(
-                        initialValue: _selectedUnit,
-                        decoration: const InputDecoration(labelText: 'Unidade'),
+                        value:
+                        units.contains(_selectedUnit) ? _selectedUnit : null,
+                        decoration:
+                        const InputDecoration(labelText: 'Unidade'),
                         items: units
-                            .map((unit) =>
-                            DropdownMenuItem(value: unit, child: Text(unit)))
+                            .map((unit) => DropdownMenuItem(
+                            value: unit, child: Text(unit)))
                             .toList(),
-                        onChanged: (value) => setState(() => _selectedUnit = value!),
+                        onChanged: (value) =>
+                            setState(() => _selectedUnit = value!),
                       );
                     },
                   ),
                   const SizedBox(height: 16),
                   categoriesAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                    const Center(child: CircularProgressIndicator()),
                     error: (err, stack) =>
                     const Text('Erro ao carregar categorias'),
                     data: (categories) {
@@ -841,8 +881,9 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                         categories.add(_selectedCategory!);
                       }
                       return DropdownButtonFormField<Category>(
-                        initialValue: _selectedCategory,
-                        decoration: const InputDecoration(labelText: 'Categoria'),
+                        value: _selectedCategory,
+                        decoration:
+                        const InputDecoration(labelText: 'Categoria'),
                         isExpanded: true,
                         items: categories.map((category) {
                           return DropdownMenuItem(
@@ -850,15 +891,17 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
                         }).toList(),
                         onChanged: (value) =>
                             setState(() => _selectedCategory = value),
-                        validator: (value) =>
-                        value == null ? 'Por favor, selecione uma categoria' : null,
+                        validator: (value) => value == null
+                            ? 'Por favor, selecione uma categoria'
+                            : null,
                       );
                     },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _notesController,
-                    decoration: const InputDecoration(labelText: 'Observações'),
+                    decoration:
+                    const InputDecoration(labelText: 'Observações'),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile(

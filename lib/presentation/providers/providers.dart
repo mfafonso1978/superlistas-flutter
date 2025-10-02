@@ -32,6 +32,8 @@ import 'package:superlistas/presentation/viewmodels/stats_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/theme_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/units_viewmodel.dart';
 
+// A IMPORTAÇÃO PROBLEMÁTICA FOI REMOVIDA DESTA LINHA
+
 // --- PROVIDERS GLOBAIS DA UI ---
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -39,11 +41,17 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((r
   return ThemeModeNotifier();
 });
 
+// Este provider é usado para acessar o Scaffold a partir do AppBar/Drawer
+final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
+  return GlobalKey<ScaffoldState>();
+});
+
 // --- SEÇÃO DE SERVIÇOS DE BACKEND (Firebase, etc.) ---
 final firebaseAuthServiceProvider = Provider<FirebaseAuthService>((ref) {
   return FirebaseAuthService();
 });
 
+// ... (O resto do arquivo permanece exatamente o mesmo)
 final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
   return RemoteConfigService(FirebaseRemoteConfig.instance);
 });
@@ -52,7 +60,6 @@ final firestoreDataSourceProvider = Provider<RemoteDataSource>((ref) {
   return FirestoreDataSourceImpl();
 });
 
-// --- SEÇÃO DE DADOS LOCAIS (SQFLITE) ---
 final databaseHelperProvider = Provider<DatabaseHelper>((ref) {
   return DatabaseHelper.instance;
 });
@@ -62,7 +69,6 @@ final localDataSourceProvider = Provider<LocalDataSource>((ref) {
   return LocalDataSourceImpl(databaseHelper: dbHelper);
 });
 
-// --- SEÇÃO DE REPOSITÓRIOS (Orquestradores de Dados) ---
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final firebaseAuthService = ref.watch(firebaseAuthServiceProvider);
   return FirebaseAuthRepositoryImpl(firebaseAuthService);
@@ -80,8 +86,6 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   );
 });
 
-// --- SEÇÃO DE VIEWMODELS E PROVIDERS DE DADOS PARA A UI ---
-
 final authViewModelProvider = StateNotifierProvider<AuthViewModel, User?>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return AuthViewModel(authRepository);
@@ -92,12 +96,11 @@ final singleListProvider = FutureProvider.autoDispose.family<ShoppingList, Strin
   return repository.getShoppingListById(id);
 });
 
-final shoppingListsStreamProvider = StreamProvider.autoDispose.family<List<ShoppingList>, String>((ref, userId) {
+final shoppingListsProvider = FutureProvider.autoDispose.family<List<ShoppingList>, String>((ref, userId) {
   final repository = ref.watch(shoppingListRepositoryProvider);
-  return repository.getShoppingListsStream(userId);
+  return repository.getShoppingLists(userId);
 });
 
-// <<< MUDANÇA: Passando o 'ref' para o construtor do ViewModel >>>
 final shoppingListsViewModelProvider = StateNotifierProvider.autoDispose.family<ShoppingListsViewModel, AsyncValue<List<ShoppingList>>, String>((ref, userId) {
   final repository = ref.watch(shoppingListRepositoryProvider);
   return ShoppingListsViewModel(ref, repository, userId);

@@ -7,16 +7,11 @@ import 'package:superlistas/core/ui/widgets/shared_widgets.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/history/history_screen.dart';
 import 'package:superlistas/presentation/views/home/home_screen.dart';
-import 'package:superlistas/presentation/views/premium/premium_screen.dart'; // <<< NOVO IMPORT
+import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 import 'package:superlistas/presentation/views/shopping_lists/shopping_lists_screen.dart';
 import 'package:superlistas/presentation/views/stats/stats_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
-  return GlobalKey<ScaffoldState>();
-});
-
-// Helper para navegação
 void _showPremiumUpsell(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => const PremiumScreen()),
@@ -177,19 +172,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final addListEnabled = ref.watch(remoteConfigServiceProvider).isAddListEnabled;
     if (!addListEnabled) return null;
 
-    if (index == 1) {
+    final listsTabIndex = ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled ? 1 : 0;
+
+    if (index == listsTabIndex) {
       return Container(
         margin: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewPadding.bottom + 80,
         ),
-        child: FloatingActionButton.extended(
+        child: FloatingActionButton(
           onPressed: () => showAddOrEditListDialog(
             context: context,
             ref: ref,
             userId: userId,
           ),
-          label: const Text('Nova Lista'),
-          icon: const Icon(Icons.add),
+          shape: const CircleBorder(),
+          child: const Icon(Icons.add),
         ),
       );
     }
@@ -197,6 +194,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 }
 
+// #############################################################################
+// CORREÇÃO FINAL APLICADA NO WIDGET ABAIXO
+// #############################################################################
 class _MainBottomNavBar extends ConsumerWidget {
   const _MainBottomNavBar();
 
@@ -206,6 +206,9 @@ class _MainBottomNavBar extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+
+    // Define as cores de fundo sólidas com base no tema
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
     final dashboardEnabled = remoteConfig.isDashboardScreenEnabled;
@@ -224,62 +227,57 @@ class _MainBottomNavBar extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: SafeArea(
-          top: false,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                  scheme.surface.withAlpha((255 * 0.80).toInt()),
-                  scheme.surface.withAlpha((255 * 0.70).toInt()),
-                ]
-                    : [
-                  Colors.white.withAlpha((255 * 0.6).toInt()),
-                  Colors.white.withAlpha((255 * 0.4).toInt()),
-                ],
-              ),
-              border: Border(top: BorderSide(color: scheme.onSurface.withAlpha((255 * 0.08).toInt()), width: 1.5)),
-            ),
-            child: BottomNavigationBar(
-              items: visibleItems,
-              currentIndex: selectedIndex,
-              onTap: (tappedIndex) {
-                final Map<int, int> visibleIndexToRealIndexMap = {};
-                int currentVisibleIndex = 0;
-                if(dashboardEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 0; }
-                if(listsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 1; }
-                if(historyEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 2; }
-                if(statsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 3; }
+    int realIndexToVisibleIndex(int realIndex) {
+      int visibleIndex = 0;
+      if (dashboardEnabled && realIndex >= 0) { if (realIndex == 0) return visibleIndex; visibleIndex++; }
+      if (listsEnabled && realIndex >= 1) { if (realIndex == 1) return visibleIndex; visibleIndex++; }
+      if (historyEnabled && realIndex >= 2) { if (realIndex == 2) return visibleIndex; visibleIndex++; }
+      if (statsEnabled && realIndex >= 3) { if (realIndex == 3) return visibleIndex; }
+      return 0;
+    }
 
-                final realIndex = visibleIndexToRealIndexMap[tappedIndex];
-                if (realIndex == null) return;
+    // Estrutura simplificada sem BackdropFilter
+    return Container(
+      decoration: BoxDecoration(
+          color: backgroundColor,
+          border: Border(top: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0,-2),
+            )
+          ]
+      ),
+      child: SafeArea(
+        top: false,
+        child: BottomNavigationBar(
+          items: visibleItems,
+          currentIndex: realIndexToVisibleIndex(selectedIndex),
+          onTap: (tappedIndex) {
+            final Map<int, int> visibleIndexToRealIndexMap = {};
+            int currentVisibleIndex = 0;
+            if(dashboardEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 0; }
+            if(listsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 1; }
+            if(historyEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 2; }
+            if(statsEnabled) { visibleIndexToRealIndexMap[currentVisibleIndex++] = 3; }
 
-                if (realIndex == 3 && !isPremium) {
-                  // <<< CORREÇÃO APLICADA AQUI >>>
-                  _showPremiumUpsell(context);
-                  return;
-                }
+            final realIndex = visibleIndexToRealIndexMap[tappedIndex];
+            if (realIndex == null) return;
 
-                final user = ref.read(authViewModelProvider.notifier).currentUser;
-                if (realIndex == 0 && user != null) {
-                  ref.invalidate(dashboardViewModelProvider(user.id));
-                }
-                ref.read(mainScreenIndexProvider.notifier).state = realIndex;
-              },
-              showUnselectedLabels: true,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              selectedItemColor: const Color(0xFF1565C0),
-              unselectedItemColor: scheme.onSurface.withAlpha((255 * 0.6).toInt()),
-            ),
-          ),
+            if (realIndex == 3 && !isPremium) {
+              _showPremiumUpsell(context);
+              return;
+            }
+
+            ref.read(mainScreenIndexProvider.notifier).state = realIndex;
+          },
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent, // Importante para a cor do Container aparecer
+          elevation: 0,
+          selectedItemColor: const Color(0xFF1565C0),
+          unselectedItemColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
         ),
       ),
     );

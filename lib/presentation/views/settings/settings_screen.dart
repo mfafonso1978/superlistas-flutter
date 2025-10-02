@@ -138,196 +138,193 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
-    final scheme = Theme.of(context).colorScheme;
+Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
+  final scheme = Theme.of(context).colorScheme;
 
-    final bool? confirm = await showGlassDialog<bool>(
-      context: context,
-      maxHeightFraction: 0.55,
-      title: Row(children: [
-        Icon(Icons.warning_amber_rounded, color: scheme.error),
-        const SizedBox(width: 12),
-        const Expanded(child: Text('AÇÃO IRREVERSÍVEL')),
-      ]),
-      content: const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Você tem certeza absoluta que deseja apagar TODOS os seus dados?', style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 16),
-        Text('Esta ação removerá:'),
-        Text('- Todas as suas listas de compras ativas.'),
-        Text('- Todo o seu histórico.'),
-        SizedBox(height: 8),
-        Text('Os dados não poderão ser recuperados.'),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Sim, Apagar Tudo'),
-        ),
-      ],
-    );
+  final bool? confirm = await showGlassDialog<bool>(
+    context: context,
+    maxHeightFraction: 0.55,
+    title: Row(children: [
+      Icon(Icons.warning_amber_rounded, color: scheme.error),
+      const SizedBox(width: 12),
+      const Expanded(child: Text('AÇÃO IRREVERSÍVEL')),
+    ]),
+    content: const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Você tem certeza absoluta que deseja apagar TODOS os seus dados?', style: TextStyle(fontWeight: FontWeight.bold)),
+      SizedBox(height: 16),
+      Text('Esta ação removerá:'),
+      Text('- Todas as suas listas de compras ativas.'),
+      Text('- Todo o seu histórico.'),
+      SizedBox(height: 8),
+      Text('Os dados não poderão ser recuperados.'),
+    ]),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+      ElevatedButton(
+        style: ElevatedButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
+        onPressed: () => Navigator.of(context).pop(true),
+        child: const Text('Sim, Apagar Tudo'),
+      ),
+    ],
+  );
 
-    if (confirm != true) return;
+  if (confirm != true) return;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text("Processando..."),
-            ]),
-          ),
+  if (!context.mounted) return;
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => const Center(
+      child: Card(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Processando..."),
+          ]),
         ),
       ),
-    );
+    ),
+  );
 
-    try {
-      await ref.read(settingsViewModelProvider.notifier).deleteAllUserData();
+  try {
+    await ref.read(settingsViewModelProvider.notifier).deleteAllUserData();
 
-      // CORREÇÃO APLICADA AQUI: Verifica se o widget ainda está montado antes de usar o context.
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // Fecha o diálogo "Processando"
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Todos os dados foram apagados com sucesso.')));
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // Fecha o diálogo "Processando"
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Todos os dados foram apagados com sucesso.')));
 
-      final currentUser = ref.read(authViewModelProvider);
-      if (currentUser != null) {
-        ref.invalidate(shoppingListsStreamProvider(currentUser.id));
-        ref.invalidate(historyViewModelProvider(currentUser.id));
-        ref.invalidate(dashboardViewModelProvider(currentUser.id));
-        ref.invalidate(statsViewModelProvider(currentUser.id));
-      }
-
-    } catch (e) {
-      // CORREÇÃO APLICADA AQUI: Verifica também no bloco de erro.
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // Fecha o diálogo "Processando"
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ocorreu um erro: $e')));
-    }
-  }
-
-  Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
-    final bool? confirm = await showGlassDialog<bool>(
-      context: context,
-      title: const Text('Confirmar Sincronização'),
-      content: const Text('Isso enviará todos os seus dados locais para a nuvem. Esta ação sobrescreverá quaisquer dados existentes na nuvem. Continuar?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-        ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sim, Sincronizar')),
-      ],
-    );
-
-    if (confirm != true) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text("Sincronizando..."),
-            ]),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      await ref.read(settingsViewModelProvider.notifier).performInitialCloudSync();
-
-      // CORREÇÃO APLICADA AQUI:
-      if (!context.mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sincronização concluída com sucesso!')));
-    } catch (e) {
-      // CORREÇÃO APLICADA AQUI:
-      if (!context.mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha na sincronização: $e')));
-    }
-  }
-
-
-  Future<void> _exportarDados(BuildContext context, WidgetRef ref) async {
     final currentUser = ref.read(authViewModelProvider);
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para exportar.')));
-      return;
-    }
-    try {
-      final jsonString = await ref.read(shoppingListRepositoryProvider).exportDataToJson(currentUser.id);
-
-      // CORREÇÃO APLICADA AQUI:
-      if (!context.mounted) return;
-      final now = DateTime.now();
-      final backupName = 'superlistas_backup_${DateFormat('yyyyMMdd_HHmmss').format(now)}.json';
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/$backupName';
-      final file = File(filePath);
-      await file.writeAsString(jsonString);
-      final xfile = XFile(filePath, name: backupName, mimeType: 'application/json');
-      await Share.shareXFiles([xfile], subject: 'Backup Superlistas', text: 'Anexo está o seu backup de dados do Superlistas de $now.');
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao exportar: $e')));
-    }
-  }
-
-  Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
-    final currentUser = ref.read(authViewModelProvider);
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para importar.')));
-      return;
-    }
-    try {
-      const group = XTypeGroup(label: 'JSON', extensions: ['json']);
-      final XFile? selected = await openFile(acceptedTypeGroups: const [group]);
-      if (selected == null) return;
-
-      // CORREÇÃO APLICADA AQUI:
-      if (!context.mounted) return;
-      final bool? confirm = await showGlassDialog<bool>(
-        context: context,
-        title: const Text('Atenção!'),
-        content: const Text('Importar um arquivo substituirá TODAS as suas listas e itens atuais. Esta ação não pode ser desfeita. Deseja continuar?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Flexible(
-              child: Text(
-                'Sim, substituir',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
-      );
-      if (confirm != true) return;
-      final content = await selected.readAsString();
-      await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content);
-
-      // CORREÇÃO APLICADA AQUI:
-      if (!context.mounted) return;
-      ref.invalidate(shoppingListsViewModelProvider(currentUser.id));
+    if (currentUser != null) {
+      // CORREÇÃO: Usando o nome correto do provider
+      ref.invalidate(shoppingListsProvider(currentUser.id));
       ref.invalidate(historyViewModelProvider(currentUser.id));
       ref.invalidate(dashboardViewModelProvider(currentUser.id));
       ref.invalidate(statsViewModelProvider(currentUser.id));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados importados com sucesso de ${selected.name}')));
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao importar: $e')));
     }
+
+  } catch (e) {
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // Fecha o diálogo "Processando"
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ocorreu um erro: $e')));
+  }
+}
+
+Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
+  final bool? confirm = await showGlassDialog<bool>(
+    context: context,
+    title: const Text('Confirmar Sincronização'),
+    content: const Text('Isso enviará todos os seus dados locais para a nuvem. Esta ação sobrescreverá quaisquer dados existentes na nuvem. Continuar?'),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+      ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sim, Sincronizar')),
+    ],
+  );
+
+  if (confirm != true) return;
+
+  if (!context.mounted) return;
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => const Center(
+      child: Card(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Sincronizando..."),
+          ]),
+        ),
+      ),
+    ),
+  );
+
+  try {
+    await ref.read(settingsViewModelProvider.notifier).performInitialCloudSync();
+
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sincronização concluída com sucesso!')));
+  } catch (e) {
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha na sincronização: $e')));
+  }
+}
+
+
+Future<void> _exportarDados(BuildContext context, WidgetRef ref) async {
+  final currentUser = ref.read(authViewModelProvider);
+  if (currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para exportar.')));
+    return;
+  }
+  try {
+    final jsonString = await ref.read(shoppingListRepositoryProvider).exportDataToJson(currentUser.id);
+
+    if (!context.mounted) return;
+    final now = DateTime.now();
+    final backupName = 'superlistas_backup_${DateFormat('yyyyMMdd_HHmmss').format(now)}.json';
+    final tempDir = await getTemporaryDirectory();
+    final filePath = '${tempDir.path}/$backupName';
+    final file = File(filePath);
+    await file.writeAsString(jsonString);
+    final xfile = XFile(filePath, name: backupName, mimeType: 'application/json');
+    await Share.shareXFiles([xfile], subject: 'Backup Superlistas', text: 'Anexo está o seu backup de dados do Superlistas de $now.');
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao exportar: $e')));
+  }
+}
+
+Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
+  final currentUser = ref.read(authViewModelProvider);
+  if (currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para importar.')));
+    return;
+  }
+  try {
+    const group = XTypeGroup(label: 'JSON', extensions: ['json']);
+    final XFile? selected = await openFile(acceptedTypeGroups: const [group]);
+    if (selected == null) return;
+
+    if (!context.mounted) return;
+    final bool? confirm = await showGlassDialog<bool>(
+      context: context,
+      title: const Text('Atenção!'),
+      content: const Text('Importar um arquivo substituirá TODAS as suas listas e itens atuais. Esta ação não pode ser desfeita. Deseja continuar?'),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Flexible(
+            child: Text(
+              'Sim, substituir',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
+    );
+    if (confirm != true) return;
+    final content = await selected.readAsString();
+    await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content);
+
+    if (!context.mounted) return;
+    // CORREÇÃO: Usando o nome correto do provider
+    ref.invalidate(shoppingListsProvider(currentUser.id));
+    ref.invalidate(historyViewModelProvider(currentUser.id));
+    ref.invalidate(dashboardViewModelProvider(currentUser.id));
+    ref.invalidate(statsViewModelProvider(currentUser.id));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados importados com sucesso de ${selected.name}')));
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao importar: $e')));
   }
 }

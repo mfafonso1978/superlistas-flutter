@@ -32,7 +32,8 @@ class StatsScreen extends ConsumerWidget {
           const _StatsBackground(),
           RefreshIndicator(
             onRefresh: pullToRefreshEnabled
-                ? () => ref.read(statsViewModelProvider(userId).notifier).loadStats()
+                ? () =>
+                ref.read(statsViewModelProvider(userId).notifier).loadStats()
                 : () async {},
             child: CustomScrollView(
               slivers: [
@@ -50,16 +51,14 @@ class StatsScreen extends ConsumerWidget {
                           [
                             if (remoteConfig.isStatsMetricsCardEnabled)
                               _buildMetricsCard(context, stats),
-
-                            if (remoteConfig.isStatsMetricsCardEnabled && remoteConfig.isStatsBarChartEnabled)
+                            if (remoteConfig.isStatsMetricsCardEnabled &&
+                                remoteConfig.isStatsBarChartEnabled)
                               const SizedBox(height: 24),
-
                             if (remoteConfig.isStatsBarChartEnabled)
                               _buildBarChartCard(context, stats),
-
-                            if (remoteConfig.isStatsBarChartEnabled && remoteConfig.isStatsPieChartEnabled)
+                            if (remoteConfig.isStatsBarChartEnabled &&
+                                remoteConfig.isStatsPieChartEnabled)
                               const SizedBox(height: 24),
-
                             if (remoteConfig.isStatsPieChartEnabled)
                               _buildPieChartCard(context, stats),
                           ],
@@ -84,7 +83,9 @@ class _StatsBackground extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedKey = ref.watch(backgroundProvider);
-    final background = availableBackgrounds.firstWhere((b) => b.key == selectedKey, orElse: () => availableBackgrounds.first);
+    final background = availableBackgrounds.firstWhere(
+            (b) => b.key == selectedKey,
+        orElse: () => availableBackgrounds.first);
     final imagePath = isDark ? background.darkAssetPath : background.lightAssetPath;
 
     return Stack(
@@ -98,7 +99,7 @@ class _StatsBackground extends ConsumerWidget {
         ),
         Positioned.fill(
           child: ColoredBox(
-            color: Colors.black.withOpacity(isDark ? 0.55 : 0.35),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.55 : 0.35)).toInt()),
           ),
         ),
       ],
@@ -112,41 +113,31 @@ class _StatsSliverAppBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color titleColor = isDark ? scheme.onSurface : Colors.white;
+    final Color titleColor = isDark ? Colors.white : Colors.black;
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
+    final baseFontSize = theme.textTheme.titleLarge?.fontSize ?? 22.0;
+    final reducedFontSize = baseFontSize * 0.7;
 
     return SliverAppBar(
       pinned: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(50),
+      backgroundColor: backgroundColor,
+      surfaceTintColor: backgroundColor,
       leading: IconButton(
         icon: Icon(Icons.menu, color: titleColor),
         onPressed: () {
           ref.read(mainScaffoldKeyProvider).currentState?.openDrawer();
         },
       ),
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? scheme.surface.withAlpha((255 * 0.3).toInt())
-                  : Colors.white.withAlpha((255 * 0.2).toInt()),
-            ),
-            child: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-              title: Text(
-                'Estatísticas',
-                style: TextStyle(
-                  color: titleColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+      title: Text(
+        'Estatísticas',
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: titleColor,
+          fontSize: reducedFontSize,
         ),
       ),
     );

@@ -1,7 +1,6 @@
 // lib/presentation/views/shopping_lists/shopping_lists_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
@@ -33,7 +32,7 @@ class _ShoppingListsBackground extends ConsumerWidget {
         ),
         Positioned.fill(
           child: ColoredBox(
-            color: Colors.black.withOpacity(isDark ? 0.55 : 0.35),
+            color: Colors.black.withAlpha((255 * (isDark ? 0.55 : 0.35)).toInt()),
           ),
         ),
       ],
@@ -52,8 +51,7 @@ class ShoppingListsScreen extends ConsumerWidget {
     }
 
     final userId = currentUser.id;
-    final shoppingListsAsync = ref.watch(shoppingListsStreamProvider(userId));
-
+    final shoppingListsAsync = ref.watch(shoppingListsProvider(userId));
     final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isShoppingListsPullToRefreshEnabled;
 
     return Scaffold(
@@ -62,8 +60,10 @@ class ShoppingListsScreen extends ConsumerWidget {
         children: [
           const Positioned.fill(child: _ShoppingListsBackground()),
           RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(shoppingListsStreamProvider(userId));
+            onRefresh: !pullToRefreshEnabled
+                ? () async {}
+                : () async {
+              ref.invalidate(shoppingListsProvider(userId));
               await Future.delayed(const Duration(milliseconds: 500));
             },
             child: CustomScrollView(
@@ -104,7 +104,9 @@ class ShoppingListsScreen extends ConsumerWidget {
       WidgetRef ref,
       String userId,
       ) {
-    if (lists.isEmpty) {
+    final activeLists = lists.where((list) => !list.isArchived).toList();
+
+    if (activeLists.isEmpty) {
       return [
         const SliverFillRemaining(
           hasScrollBody: false,
@@ -116,9 +118,9 @@ class ShoppingListsScreen extends ConsumerWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
           sliver: SliverList.builder(
-            itemCount: lists.length,
+            itemCount: activeLists.length,
             itemBuilder: (context, index) {
-              final list = lists[index];
+              final list = activeLists[index];
               return _ShoppingListItem(
                 list: list,
                 onEdit: () => showAddOrEditListDialog(
@@ -142,58 +144,32 @@ class _ShoppingListsSliverAppBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color titleColor = isDark ? scheme.onSurface : Colors.white;
+    final Color titleColor = isDark ? Colors.white : Colors.black;
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
+    final baseFontSize = theme.textTheme.titleLarge?.fontSize ?? 22.0;
+    final reducedFontSize = baseFontSize * 0.7;
 
     return SliverAppBar(
       pinned: true,
       floating: false,
-      backgroundColor: Colors.transparent,
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(50),
+      backgroundColor: backgroundColor,
+      surfaceTintColor: backgroundColor,
       leading: IconButton(
         icon: Icon(Icons.menu, color: titleColor),
         onPressed: () {
           ref.read(mainScaffoldKeyProvider).currentState?.openDrawer();
         },
       ),
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                  scheme.surface.withOpacity(0.80),
-                  scheme.surface.withOpacity(0.70),
-                ]
-                    : [
-                  Colors.white.withOpacity(0.6),
-                  Colors.white.withOpacity(0.4),
-                ],
-              ),
-              border: Border(
-                bottom: BorderSide(
-                  color: scheme.onSurface.withOpacity(0.08),
-                  width: 1.5,
-                ),
-              ),
-            ),
-            child: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: const EdgeInsetsDirectional.only(start: 60.0, bottom: 16.0),
-              title: Text(
-                'Minhas Listas',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: titleColor,
-                ),
-              ),
-            ),
-          ),
+      title: Text(
+        'Minhas Listas',
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: titleColor,
+          fontSize: reducedFontSize,
         ),
       ),
     );
@@ -218,13 +194,13 @@ class _EmptyState extends ConsumerWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                scheme.surface.withOpacity(0.8),
-                scheme.surface.withOpacity(0.6),
+                scheme.surface.withAlpha((255 * 0.8).toInt()),
+                scheme.surface.withAlpha((255 * 0.6).toInt()),
               ],
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: scheme.outline.withOpacity(0.2),
+              color: scheme.outline.withAlpha((255 * 0.2).toInt()),
               width: 1,
             ),
           ),
@@ -232,25 +208,18 @@ class _EmptyState extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.shopping_cart_outlined,
-                  size: 60, color: scheme.secondary),
+              Icon(Icons.shopping_cart_outlined, size: 60, color: scheme.secondary),
               const SizedBox(height: 20),
               Text(
                 'Nenhuma lista de compras',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(color: scheme.onSurface, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: scheme.onSurface, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               if (addListEnabled)
                 Text(
                   'Crie sua primeira lista clicando no botão "+"',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
             ],
@@ -270,8 +239,7 @@ Future<bool?> _showDeleteConfirmationDialog(
     context: context,
     title: Row(
       children: [
-        Icon(Icons.warning_amber_rounded,
-            color: Theme.of(context).colorScheme.error),
+        Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error),
         const SizedBox(width: 12),
         const Text('Confirmar Exclusão'),
       ],
@@ -339,13 +307,13 @@ class _ShoppingListItem extends ConsumerWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            scheme.surface.withOpacity(0.8),
-            scheme.surface.withOpacity(0.6),
+            scheme.surface.withAlpha((255 * 0.8).toInt()),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: scheme.outline.withOpacity(0.2),
+          color: scheme.outline.withAlpha((255 * 0.2).toInt()),
           width: 1,
         ),
       ),
@@ -362,7 +330,7 @@ class _ShoppingListItem extends ConsumerWidget {
                 ),
               ),
             ).then((_) {
-              ref.invalidate(shoppingListsStreamProvider(userId));
+              ref.invalidate(shoppingListsProvider(userId));
               ref.invalidate(historyViewModelProvider(userId));
               ref.invalidate(dashboardViewModelProvider(userId));
             });
@@ -397,12 +365,12 @@ class _ShoppingListItem extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isCompleted ? scheme.onSurface.withOpacity(0.5) : scheme.onSurface,
+                              color: isCompleted ? scheme.onSurface.withAlpha((255 * 0.5).toInt()) : scheme.onSurface,
                               decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
                               shadows: [
                                 Shadow(
                                   blurRadius: 4.0,
-                                  color: Colors.black.withOpacity(0.4),
+                                  color: Colors.black.withAlpha((255 * 0.4).toInt()),
                                   offset: const Offset(1.0, 1.0),
                                 ),
                               ],
@@ -413,14 +381,14 @@ class _ShoppingListItem extends ConsumerWidget {
                           Text(
                             'Criada em: ${DateFormat('dd/MM/yyyy').format(list.creationDate)}',
                             style: TextStyle(
-                              color: scheme.onSurfaceVariant.withOpacity(0.8),
+                              color: scheme.onSurfaceVariant.withAlpha((255 * 0.8).toInt()),
                               fontSize: 12,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    if(editEnabled || deleteEnabled || archiveEnabled)
+                    if (editEnabled || deleteEnabled || archiveEnabled)
                       PopupMenuButton<String>(
                         icon: Icon(Icons.more_vert, color: scheme.onSurface),
                         onSelected: (value) async {
@@ -483,7 +451,7 @@ class _ShoppingListItem extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                         child: LinearProgressIndicator(
                           value: budgetProgress,
-                          backgroundColor: scheme.surfaceContainerHighest.withOpacity(0.3),
+                          backgroundColor: scheme.surfaceContainerHighest.withAlpha((255 * 0.3).toInt()),
                           valueColor: AlwaysStoppedAnimation<Color>(budgetColor),
                           minHeight: 6,
                         ),

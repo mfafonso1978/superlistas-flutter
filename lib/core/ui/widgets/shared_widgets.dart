@@ -17,28 +17,27 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color foregroundColor = isDark ? scheme.onSurface : Colors.white;
+    final Color foregroundColor = isDark ? Colors.white : Colors.black;
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: AppBar(
-          title: title,
-          titleTextStyle: theme.textTheme.headlineSmall?.copyWith(
-            color: foregroundColor,
-            fontWeight: FontWeight.w800,
-          ),
-          iconTheme: IconThemeData(color: foregroundColor),
-          backgroundColor: isDark
-              ? scheme.surface.withOpacity(0.2)
-              : Colors.white.withOpacity(0.15),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
+    // Pega o tamanho da fonte base do tema e aplica a redução
+    final baseFontSize = theme.textTheme.titleLarge?.fontSize ?? 22.0;
+    final reducedFontSize = baseFontSize * 0.7;
+
+    return AppBar(
+      title: title,
+      titleTextStyle: theme.textTheme.titleLarge?.copyWith(
+        color: foregroundColor,
+        fontWeight: FontWeight.w800,
+        fontSize: reducedFontSize,
       ),
+      iconTheme: IconThemeData(color: foregroundColor),
+      backgroundColor: backgroundColor,
+      surfaceTintColor: backgroundColor,
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(50),
     );
   }
 
@@ -65,17 +64,17 @@ class GlassCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-            scheme.surface.withOpacity(0.6),
-            scheme.surface.withOpacity(0.4),
+            scheme.surface.withAlpha((255 * 0.6).toInt()),
+            scheme.surface.withAlpha((255 * 0.4).toInt()),
           ]
               : [
-            Colors.white.withOpacity(0.7),
-            Colors.white.withOpacity(0.5),
+            Colors.white.withAlpha((255 * 0.7).toInt()),
+            Colors.white.withAlpha((255 * 0.5).toInt()),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withAlpha((255 * 0.2).toInt()),
           width: 1,
         ),
       ),
@@ -108,7 +107,12 @@ class Indicator extends StatelessWidget {
             decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: onSurface), overflow: TextOverflow.ellipsis,)),
+          Expanded(
+              child: Text(
+                text,
+                style: TextStyle(color: onSurface),
+                overflow: TextOverflow.ellipsis,
+              )),
         ],
       ),
     );

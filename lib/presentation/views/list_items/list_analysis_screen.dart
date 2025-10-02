@@ -17,8 +17,8 @@ class ListAnalysisScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final itemsAsync = ref.watch(listItemsViewModelProvider(shoppingList.id));
-    final theme = Theme.of(context);
+    // CORREÇÃO APLICADA AQUI: Observando o provider de dados correto.
+    final itemsAsync = ref.watch(listItemsStreamProvider(shoppingList.id));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -32,7 +32,7 @@ class ListAnalysisScreen extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          AppBackground(), // <<< CORRIGIDO
+          AppBackground(),
           SafeArea(
             child: itemsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

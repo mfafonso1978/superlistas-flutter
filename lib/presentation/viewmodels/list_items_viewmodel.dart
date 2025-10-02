@@ -21,7 +21,8 @@ class ListItemsViewModel extends StateNotifier<AsyncValue<List<Item>>> {
       final userId = list.userId;
 
       ref.invalidate(listItemsStreamProvider(_shoppingListId));
-      ref.invalidate(shoppingListsStreamProvider(userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(userId));
       ref.invalidate(dashboardViewModelProvider(userId));
       ref.invalidate(singleListProvider(_shoppingListId));
     } catch (_) {
@@ -80,7 +81,8 @@ class ListItemsViewModel extends StateNotifier<AsyncValue<List<Item>>> {
     try {
       final listToArchive = list.copyWith(isArchived: true);
       await _repository.updateShoppingList(listToArchive);
-      ref.invalidate(shoppingListsStreamProvider(list.userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(list.userId));
       ref.invalidate(historyViewModelProvider(list.userId));
       ref.invalidate(dashboardViewModelProvider(list.userId));
     } catch (e, s) {

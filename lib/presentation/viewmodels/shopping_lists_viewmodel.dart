@@ -29,11 +29,12 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
 
     try {
       await _repository.createShoppingList(newList);
-      // Após a persistência, invalida o stream para que a UI se atualize.
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       ref.invalidate(dashboardViewModelProvider(_userId));
     } catch (e) {
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
     }
   }
 
@@ -41,10 +42,12 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
     final updatedList = list.copyWith(name: newName, budget: budget);
     try {
       await _repository.updateShoppingList(updatedList);
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       ref.invalidate(dashboardViewModelProvider(_userId));
     } catch (e) {
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
     }
   }
 
@@ -52,7 +55,8 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
     try {
       final listToArchive = list.copyWith(isArchived: true);
       await _repository.updateShoppingList(listToArchive);
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       ref.invalidate(historyViewModelProvider(_userId));
       ref.invalidate(dashboardViewModelProvider(_userId));
     } catch (e, s) {
@@ -63,16 +67,16 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
   Future<void> deleteList(String id) async {
     try {
       await _repository.deleteShoppingList(id);
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       ref.invalidate(historyViewModelProvider(_userId));
       ref.invalidate(dashboardViewModelProvider(_userId));
     } catch (e) {
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
     }
   }
 
-  // Ações complexas que não precisam de atualização otimista podem permanecer como estão.
-  // Elas já recarregam a lista ao final ou invalidam os providers.
   Future<String> _createEmptyList({
     required String name,
     double? budget,
@@ -110,7 +114,8 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
         );
         await _repository.createItem(cloned, newListId);
       }
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       return newListId;
     } catch (e, s) {
       state = AsyncValue.error(e, s);
@@ -164,7 +169,8 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
           await _repository.createItem(cloned, newListId);
         }
       }
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       return newListId;
     } catch (e, s) {
       state = AsyncValue.error(e, s);
@@ -182,7 +188,8 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
         final updated = l.copyWith(isArchived: true);
         await _repository.updateShoppingList(updated);
       }
-      ref.invalidate(shoppingListsStreamProvider(_userId));
+      // CORREÇÃO APLICADA AQUI
+      ref.invalidate(shoppingListsProvider(_userId));
       ref.invalidate(historyViewModelProvider(_userId));
       return toArchive.length;
     } catch (e, s) {

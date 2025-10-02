@@ -50,13 +50,13 @@ class CustomDrawer extends ConsumerWidget {
           child: Container(
             decoration: BoxDecoration(
               color: isDark
-                  ? scheme.surface.withOpacity(0.3)
-                  : scheme.surface.withOpacity(0.4),
+                  ? scheme.surface.withAlpha((255 * 0.3).toInt())
+                  : scheme.surface.withAlpha((255 * 0.4).toInt()),
               border: Border(
                 right: BorderSide(
                   color: isDark
-                      ? Colors.white.withOpacity(0.1)
-                      : scheme.outline.withOpacity(0.2),
+                      ? Colors.white.withAlpha((255 * 0.1).toInt())
+                      : scheme.outline.withAlpha((255 * 0.2).toInt()),
                   width: 1,
                 ),
               ),
@@ -112,7 +112,7 @@ class CustomDrawer extends ConsumerWidget {
 
                       if (categoriesEnabled || settingsEnabled)
                         Divider(
-                            color: scheme.outlineVariant.withOpacity(0.3),
+                            color: scheme.outlineVariant.withAlpha((255 * 0.3).toInt()),
                             height: 16),
 
                       if (categoriesEnabled)
@@ -127,7 +127,7 @@ class CustomDrawer extends ConsumerWidget {
                           context,
                           icon: Icons.settings_rounded,
                           text: 'Configurações',
-                          onTap: () => _navigateTo(context, const SettingsScreen()),
+                          onTap: () => _navigateTo(context, SettingsScreen()),
                         ),
 
                       const Divider(
@@ -209,17 +209,17 @@ class CustomDrawer extends ConsumerWidget {
           icon,
           color: isSelected
               ? selectedColor
-              : (isDark ? scheme.onSurfaceVariant : scheme.onSurface.withOpacity(0.8))
+              : (isDark ? scheme.onSurfaceVariant : scheme.onSurface.withAlpha((255 * 0.8).toInt()))
       ),
       selected: isSelected,
-      selectedTileColor: selectedColor.withOpacity(0.15),
+      selectedTileColor: selectedColor.withAlpha((255 * 0.15).toInt()),
       title: Text(
         text,
         style: GoogleFonts.poppins(
           fontSize: 16,
           color: isSelected
               ? selectedColor
-              : (isDark ? scheme.onSurface : scheme.onSurface.withOpacity(0.9)),
+              : (isDark ? scheme.onSurface : scheme.onSurface.withAlpha((255 * 0.9).toInt())),
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -243,8 +243,8 @@ class _DrawerHeader extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            scheme.primary.withOpacity(0.7),
-            scheme.primary.withOpacity(0.5),
+            scheme.primary.withAlpha((255 * 0.7).toInt()),
+            scheme.primary.withAlpha((255 * 0.5).toInt()),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -285,7 +285,7 @@ class _DrawerHeader extends StatelessWidget {
                 Text(
                   userEmail,
                   style: TextStyle(
-                    color: scheme.onPrimary.withOpacity(0.8),
+                    color: scheme.onPrimary.withAlpha((255 * 0.8).toInt()),
                     fontSize: 12,
                   ),
                   maxLines: 1,
@@ -321,7 +321,7 @@ class _ThemeToggle extends ConsumerWidget {
           label,
           style: GoogleFonts.poppins(
             fontSize: 16,
-            color: isDark ? scheme.onSurface : scheme.onSurface.withOpacity(0.9),
+            color: isDark ? scheme.onSurface : scheme.onSurface.withAlpha((255 * 0.9).toInt()),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -344,7 +344,7 @@ class _ThemeToggle extends ConsumerWidget {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return activeSwitchColor.withOpacity(0.3);
+            return activeSwitchColor.withAlpha((255 * 0.3).toInt());
           }
           return isDark
               ? Colors.grey[700]

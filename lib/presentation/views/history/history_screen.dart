@@ -18,7 +18,6 @@ FutureProvider.autoDispose.family<List<Item>, String>((ref, listId) {
   return repository.getItems(listId);
 });
 
-
 void _showPremiumUpsell(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => const PremiumScreen()),
@@ -38,7 +37,8 @@ class HistoryScreen extends ConsumerWidget {
     final userId = currentUser.id;
     final historyAsync = ref.watch(historyViewModelProvider(userId));
     final scheme = Theme.of(context).colorScheme;
-    final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isHistoryPullToRefreshEnabled;
+    final pullToRefreshEnabled =
+        ref.watch(remoteConfigServiceProvider).isHistoryPullToRefreshEnabled;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -47,7 +47,8 @@ class HistoryScreen extends ConsumerWidget {
           AppBackground(),
           RefreshIndicator(
             onRefresh: pullToRefreshEnabled
-                ? () => ref.read(historyViewModelProvider(userId).notifier).loadHistory()
+                ? () =>
+                ref.read(historyViewModelProvider(userId).notifier).loadHistory()
                 : () async {},
             child: CustomScrollView(
               slivers: [
@@ -143,41 +144,31 @@ class _HistorySliverAppBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color titleColor = isDark ? scheme.onSurface : Colors.white;
+    final Color titleColor = isDark ? Colors.white : Colors.black;
+    final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
+    final baseFontSize = theme.textTheme.titleLarge?.fontSize ?? 22.0;
+    final reducedFontSize = baseFontSize * 0.7;
 
     return SliverAppBar(
       pinned: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(50),
+      backgroundColor: backgroundColor,
+      surfaceTintColor: backgroundColor,
       leading: IconButton(
         icon: Icon(Icons.menu, color: titleColor),
         onPressed: () {
           ref.read(mainScaffoldKeyProvider).currentState?.openDrawer();
         },
       ),
-      flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? scheme.surface.withAlpha((255 * 0.3).toInt())
-                  : Colors.white.withAlpha((255 * 0.2).toInt()),
-            ),
-            child: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-              title: Text(
-                'Histórico de Listas',
-                style: TextStyle(
-                  color: titleColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+      title: Text(
+        'Histórico de Listas',
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: titleColor,
+          fontSize: reducedFontSize,
         ),
       ),
     );
@@ -186,7 +177,7 @@ class _HistorySliverAppBar extends ConsumerWidget {
 
 class _HistoryListItem extends ConsumerStatefulWidget {
   final ShoppingList list;
-  const _HistoryListItem({super.key, required this.list});
+  const _HistoryListItem({required this.list});
 
   @override
   ConsumerState<_HistoryListItem> createState() => _HistoryListItemState();
@@ -241,16 +232,19 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
         child: Column(
           children: [
             InkWell(
-              onTap: viewItemsEnabled ? () {
+              onTap: viewItemsEnabled
+                  ? () {
                 setState(() {
                   _isExpanded = !_isExpanded;
                 });
-              } : null,
+              }
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_outline, color: scheme.secondary, size: 28),
+                    Icon(Icons.check_circle_outline,
+                        color: scheme.secondary, size: 28),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -268,28 +262,34 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                           const SizedBox(height: 4),
                           Text(
                             'Concluída em: ${DateFormat('dd/MM/yyyy').format(widget.list.creationDate)}\n${widget.list.totalItems} itens',
-                            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                            style: TextStyle(
+                                color: scheme.onSurfaceVariant, fontSize: 12),
                           ),
                         ],
                       ),
                     ),
-                    if(reuseListEnabled || deleteHistoryEnabled)
+                    if (reuseListEnabled || deleteHistoryEnabled)
                       PopupMenuButton<String>(
                         icon: Icon(Icons.more_vert, color: scheme.onSurface),
                         onSelected: (value) async {
                           if (value == 'reuse') {
                             if (isPremium) {
                               await ref
-                                  .read(historyViewModelProvider(userId).notifier)
+                                  .read(historyViewModelProvider(userId)
+                                  .notifier)
                                   .reuseList(widget.list);
                               if (!context.mounted) return;
-                              ref.invalidate(shoppingListsViewModelProvider(userId));
+                              ref.invalidate(shoppingListsProvider(userId));
 
                               int listsTabIndex = 1;
-                              if (ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled == false) {
+                              if (ref
+                                  .read(remoteConfigServiceProvider)
+                                  .isDashboardScreenEnabled ==
+                                  false) {
                                 listsTabIndex = 0;
                               }
-                              ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
+                              ref.read(mainScreenIndexProvider.notifier).state =
+                                  listsTabIndex;
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -300,14 +300,16 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                               _showPremiumUpsell(context);
                             }
                           } else if (value == 'delete') {
-                            final bool? shouldDelete = await showGlassDialog<bool>(
+                            final bool? shouldDelete =
+                            await showGlassDialog<bool>(
                               context: context,
                               title: const Text('Confirmar Exclusão'),
                               content: Text(
                                   'Tem certeza de que deseja excluir permanentemente a lista "${widget.list.name}"?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
                                   child: const Text('Cancelar'),
                                 ),
                                 ElevatedButton(
@@ -315,26 +317,30 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
                                   ),
-                                  onPressed: () => Navigator.of(context).pop(true),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
                                   child: const Text('Excluir'),
                                 ),
                               ],
                             );
                             if (shouldDelete == true) {
                               await ref
-                                  .read(historyViewModelProvider(userId).notifier)
+                                  .read(historyViewModelProvider(userId)
+                                  .notifier)
                                   .deleteList(widget.list.id);
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                    content: Text('Lista "${widget.list.name}" excluída.')),
+                                    content: Text(
+                                        'Lista "${widget.list.name}" excluída.')),
                               );
                             }
                           }
                         },
                         itemBuilder: (BuildContext context) {
                           final theme = Theme.of(context);
-                          final iconColor = theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
+                          final iconColor = theme.colorScheme.onSurface
+                              .withAlpha((255 * 0.7).toInt());
 
                           final List<PopupMenuEntry<String>> items = [];
                           if (reuseListEnabled) {
@@ -344,7 +350,9 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                                 data: IconThemeData(color: iconColor),
                                 child: Row(
                                   children: [
-                                    Icon(isPremium ? Icons.copy_all_rounded : Icons.lock_outline),
+                                    Icon(isPremium
+                                        ? Icons.copy_all_rounded
+                                        : Icons.lock_outline),
                                     const SizedBox(width: 12),
                                     const Text('Reutilizar Lista'),
                                   ],
@@ -355,9 +363,9 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                           if (deleteHistoryEnabled) {
                             items.add(PopupMenuItem<String>(
                               value: 'delete',
-                              child: IconTheme(
-                                data: const IconThemeData(color: Colors.red),
-                                child: const Row(
+                              child: const IconTheme(
+                                data: IconThemeData(color: Colors.red),
+                                child: Row(
                                   children: [
                                     Icon(Icons.delete_forever_outlined),
                                     SizedBox(width: 12),
@@ -377,7 +385,8 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              child: _isExpanded ? _buildExpandedContent() : const SizedBox.shrink(),
+              child:
+              _isExpanded ? _buildExpandedContent() : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -390,8 +399,11 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final itemColor = isDark ? Colors.white70 : scheme.onSurface.withAlpha((255 * 0.8).toInt());
-    final subItemColor = isDark ? Colors.white54 : scheme.onSurfaceVariant.withAlpha((255 * 0.8).toInt());
+    final itemColor =
+    isDark ? Colors.white70 : scheme.onSurface.withAlpha((255 * 0.8).toInt());
+    final subItemColor = isDark
+        ? Colors.white54
+        : scheme.onSurfaceVariant.withAlpha((255 * 0.8).toInt());
 
     return Container(
       color: (isDark ? Colors.black : Colors.white).withAlpha((255 * 0.1).toInt()),
@@ -402,13 +414,17 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
         ),
         error: (err, _) => Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Center(child: Text('Erro ao carregar itens.', style: TextStyle(color: itemColor))),
+          child: Center(
+              child: Text('Erro ao carregar itens.',
+                  style: TextStyle(color: itemColor))),
         ),
         data: (items) {
-          if(items.isEmpty) {
+          if (items.isEmpty) {
             return Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Center(child: Text('Esta lista não tinha itens.', style: TextStyle(color: itemColor))),
+              child: Center(
+                  child: Text('Esta lista não tinha itens.',
+                      style: TextStyle(color: itemColor))),
             );
           }
           return ListView.separated(
@@ -418,7 +434,8 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
             separatorBuilder: (context, index) => Divider(
               height: 1,
               thickness: 1,
-              color: (isDark ? Colors.white : scheme.primary).withAlpha((255 * 0.1).toInt()),
+              color:
+              (isDark ? Colors.white : scheme.primary).withAlpha((255 * 0.1).toInt()),
               indent: 16,
               endIndent: 16,
             ),
@@ -427,11 +444,17 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
               return ListTile(
                 dense: true,
                 leading: Icon(
-                  item.isChecked ? Icons.check_box : Icons.check_box_outline_blank,
+                  item.isChecked
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
                   color: item.isChecked ? scheme.secondary : itemColor,
                 ),
-                title: Text(item.name, style: TextStyle(color: itemColor, fontWeight: FontWeight.w500)),
-                subtitle: Text('${NumberFormat().format(item.quantity)} ${item.unit}', style: TextStyle(color: subItemColor)),
+                title: Text(item.name,
+                    style:
+                    TextStyle(color: itemColor, fontWeight: FontWeight.w500)),
+                subtitle: Text(
+                    '${NumberFormat().format(item.quantity)} ${item.unit}',
+                    style: TextStyle(color: subItemColor)),
               );
             },
           );
