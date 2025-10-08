@@ -34,6 +34,9 @@ class SettingsScreen extends ConsumerWidget {
     final unitsScreenEnabled = remoteConfig.isUnitsScreenEnabled;
     final importExportEnabled = remoteConfig.isImportExportEnabled;
 
+    // Verifica se o usuário logado é do tipo e-mail/senha
+    final isPasswordUser = ref.read(authViewModelProvider.notifier).isPasswordProvider();
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -74,8 +77,33 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                     ]),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                 ],
+
+                GlassCard(
+                  child: Column(
+                    children: [
+                      // Só mostra "Alterar Senha" se o usuário for do tipo e-mail/senha
+                      if(isPasswordUser) ...[
+                        ListTile(
+                          leading: Icon(Icons.lock_reset_rounded, color: scheme.secondary),
+                          title: const Text('Alterar senha'),
+                          subtitle: const Text('Envia um link de recuperação para seu e-mail'),
+                          onTap: () => _resetPassword(context, ref),
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                      ],
+                      ListTile(
+                        leading: Icon(Icons.no_accounts_rounded, color: scheme.error),
+                        title: Text('Excluir minha conta', style: TextStyle(color: scheme.error)),
+                        subtitle: const Text('Esta ação é permanente e irreversível'),
+                        onTap: () => _deleteAccount(context, ref, isPasswordUser),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 if (unitsScreenEnabled || importExportEnabled) ...[
                   GlassCard(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -140,6 +168,109 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+Future<void> _resetPassword(BuildContext context, WidgetRef ref) async {
+  final user = ref.read(authViewModelProvider);
+  if (user == null || user.email.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(backgroundColor: Colors.red, content: Text('Usuário não encontrado ou sem e-mail cadastrado.')),
+    );
+    return;
+  }
+
+  final messenger = ScaffoldMessenger.of(context);
+
+  try {
+    await ref.read(authViewModelProvider.notifier).sendPasswordResetEmail(user.email);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Link de recuperação enviado! Verifique seu e-mail (e a caixa de spam).')),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(backgroundColor: Colors.red, content: Text('Erro: ${e.toString()}')),
+    );
+  }
+}
+
+Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPasswordUser) async {
+  final scheme = Theme.of(context).colorScheme;
+  final messenger = ScaffoldMessenger.of(context);
+
+  if (!isPasswordUser) {
+    await showGlassDialog(
+      context: context,
+      title: const Text('Excluir Conta Google'),
+      content: const Text('Para excluir uma conta conectada com o Google, por segurança, você precisa fazer logout e login novamente antes de prosseguir. Esta funcionalidade será aprimorada em breve.'),
+      actions: [
+        ElevatedButton(onPressed: () => Navigator.of(context, rootNavigator: true).pop(), child: const Text('Entendi')),
+      ],
+    );
+    return;
+  }
+
+  final passwordController = TextEditingController();
+  final bool? confirm = await showGlassDialog<bool>(
+    context: context,
+    title: const Text('Excluir Conta'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Esta ação é permanente. Para confirmar, por favor, digite sua senha:'),
+        const SizedBox(height: 16),
+        TextField(
+          controller: passwordController,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Senha'),
+          onSubmitted: (_) {
+            if (passwordController.text.isNotEmpty) {
+              Navigator.of(context, rootNavigator: true).pop(true);
+            }
+          },
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.of(context, rootNavigator: true).pop(false), child: const Text('Cancelar')),
+      ElevatedButton(
+        style: ElevatedButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
+        onPressed: () {
+          if (passwordController.text.isNotEmpty) {
+            Navigator.of(context, rootNavigator: true).pop(true);
+          }
+        },
+        child: const Text('Excluir Permanentemente'),
+      ),
+    ],
+  );
+
+  if (confirm != true || passwordController.text.isEmpty) return;
+  if (!context.mounted) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => const Center(child: CircularProgressIndicator()),
+  );
+
+  try {
+    await ref.read(authViewModelProvider.notifier).reauthenticateAndDeleteAccount(passwordController.text);
+    if(context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Sua conta foi excluída com sucesso.')),
+      );
+    }
+  } catch (e) {
+    if(context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(e.toString())),
+      );
+    }
+  }
+}
+
 Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   final scheme = Theme.of(context).colorScheme;
 
@@ -171,8 +302,8 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   );
 
   if (confirm != true) return;
-
   if (!context.mounted) return;
+
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -191,15 +322,16 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   );
 
   try {
+    // Note: This relies on a 'deleteAllUserData' method in a different ViewModel.
+    // Assuming 'settingsViewModelProvider' has this method from previous context.
     await ref.read(settingsViewModelProvider.notifier).deleteAllUserData();
 
     if (!context.mounted) return;
-    Navigator.of(context).pop(); // Fecha o diálogo "Processando"
+    Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Todos os dados foram apagados com sucesso.')));
 
     final currentUser = ref.read(authViewModelProvider);
     if (currentUser != null) {
-      // CORREÇÃO: Usando o nome correto do provider
       ref.invalidate(shoppingListsProvider(currentUser.id));
       ref.invalidate(historyViewModelProvider(currentUser.id));
       ref.invalidate(dashboardViewModelProvider(currentUser.id));
@@ -208,12 +340,13 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
 
   } catch (e) {
     if (!context.mounted) return;
-    Navigator.of(context).pop(); // Fecha o diálogo "Processando"
+    Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ocorreu um erro: $e')));
   }
 }
 
 Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
+  if (!context.mounted) return;
   final bool? confirm = await showGlassDialog<bool>(
     context: context,
     title: const Text('Confirmar Sincronização'),
@@ -225,8 +358,8 @@ Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
   );
 
   if (confirm != true) return;
-
   if (!context.mounted) return;
+
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -260,8 +393,9 @@ Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
 
 Future<void> _exportarDados(BuildContext context, WidgetRef ref) async {
   final currentUser = ref.read(authViewModelProvider);
+  final messenger = ScaffoldMessenger.of(context);
   if (currentUser == null) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para exportar.')));
+    messenger.showSnackBar(const SnackBar(content: Text('Você precisa estar logado para exportar.')));
     return;
   }
   try {
@@ -278,14 +412,15 @@ Future<void> _exportarDados(BuildContext context, WidgetRef ref) async {
     await Share.shareXFiles([xfile], subject: 'Backup Superlistas', text: 'Anexo está o seu backup de dados do Superlistas de $now.');
   } catch (e) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao exportar: $e')));
+    messenger.showSnackBar(SnackBar(content: Text('Falha ao exportar: $e')));
   }
 }
 
 Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
   final currentUser = ref.read(authViewModelProvider);
+  final messenger = ScaffoldMessenger.of(context);
   if (currentUser == null) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Você precisa estar logado para importar.')));
+    messenger.showSnackBar(const SnackBar(content: Text('Você precisa estar logado para importar.')));
     return;
   }
   try {
@@ -317,14 +452,13 @@ Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
     await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content);
 
     if (!context.mounted) return;
-    // CORREÇÃO: Usando o nome correto do provider
     ref.invalidate(shoppingListsProvider(currentUser.id));
     ref.invalidate(historyViewModelProvider(currentUser.id));
     ref.invalidate(dashboardViewModelProvider(currentUser.id));
     ref.invalidate(statsViewModelProvider(currentUser.id));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados importados com sucesso de ${selected.name}')));
+    messenger.showSnackBar(SnackBar(content: Text('Dados importados com sucesso de ${selected.name}')));
   } catch (e) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao importar: $e')));
+    messenger.showSnackBar(SnackBar(content: Text('Falha ao importar: $e')));
   }
 }

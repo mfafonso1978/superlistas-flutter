@@ -16,13 +16,9 @@ class FirebaseAuthService {
   User? _userFromFirebase(firebase.User? user) {
     if (user == null) return null;
 
-    // <<< PRINT DE DEBUG 3: Verificando o mapeamento final >>>
-    print('[DEBUG - Mapeamento] Mapeando firebase.User para a entidade User:');
-    print('[DEBUG - Mapeamento]   photoURL do Firebase: ${user.photoURL}');
-
     return User(
       id: user.uid,
-      name: user.displayName ?? 'Usuário sem nome',
+      name: user.displayName ?? user.email ?? 'Usuário',
       email: user.email ?? '',
       photoUrl: user.photoURL,
     );
@@ -36,20 +32,19 @@ class FirebaseAuthService {
     return _userFromFirebase(_firebaseAuth.currentUser);
   }
 
+  // Verifica se o usuário logou com provedor de senha (e-mail)
+  bool isPasswordProvider() {
+    if (_firebaseAuth.currentUser == null) return false;
+    return _firebaseAuth.currentUser!.providerData
+        .any((userInfo) => userInfo.providerId == 'password');
+  }
+
   Future<User?> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print('[DEBUG - GoogleSignIn] O usuário cancelou o login com o Google.');
         return null;
       }
-
-      // <<< PRINT DE DEBUG 1: Verificando o que o Google nos devolveu >>>
-      print('[DEBUG - GoogleSignIn] Informações recebidas DIRETAMENTE do Google:');
-      print('[DEBUG - GoogleSignIn]   Display Name: ${googleUser.displayName}');
-      print('[DEBUG - GoogleSignIn]   Email: ${googleUser.email}');
-      print('[DEBUG - GoogleSignIn]   Photo URL: ${googleUser.photoUrl}');
-
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final firebase.AuthCredential credential = firebase.GoogleAuthProvider.credential(
@@ -60,17 +55,72 @@ class FirebaseAuthService {
       final firebase.UserCredential userCredential =
       await _firebaseAuth.signInWithCredential(credential);
 
-      // <<< PRINT DE DEBUG 2: Verificando o que o Firebase Auth criou >>>
-      print('[DEBUG - FirebaseUser] Informações no objeto firebase.User APÓS login:');
-      print('[DEBUG - FirebaseUser]   Display Name: ${userCredential.user?.displayName}');
-      print('[DEBUG - FirebaseUser]   Email: ${userCredential.user?.email}');
-      print('[DEBUG - FirebaseUser]   Photo URL: ${userCredential.user?.photoURL}');
-
-
       return _userFromFirebase(userCredential.user);
     } catch (e) {
-      print('Erro durante o login com Google: $e');
-      return null;
+      throw Exception('Erro durante o login com Google: ${e.toString()}');
+    }
+  }
+
+  Future<User?> signUpWithEmailAndPassword(String name, String email, String password) async {
+    try {
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      await userCredential.user?.updateDisplayName(name);
+      await userCredential.user?.reload();
+      return _userFromFirebase(_firebaseAuth.currentUser);
+    } on firebase.FirebaseAuthException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  Future<User?> signInWithEmailAndPassword(String email, String password) async {
+    try {
+      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return _userFromFirebase(userCredential.user);
+    } on firebase.FirebaseAuthException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: email);
+    } on firebase.FirebaseAuthException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  // --- NOVO MÉTODO PARA REAUTENTICAR E EXCLUIR CONTA ---
+  Future<void> reauthenticateAndDeleteAccount(String password) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null || user.email == null) {
+        throw Exception('Usuário não encontrado para reautenticação.');
+      }
+
+      // Cria a credencial para reautenticar
+      final cred = firebase.EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+
+      // Reautentica o usuário para confirmar a identidade
+      await user.reauthenticateWithCredential(cred);
+
+      // Se a reautenticação for bem-sucedida, exclui a conta
+      await user.delete();
+
+    } on firebase.FirebaseAuthException catch (e) {
+      // Personaliza mensagens de erro comuns
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw Exception('A senha informada está incorreta.');
+      }
+      throw Exception('Erro ao excluir conta: ${e.message}');
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/domain/entities/item.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
+import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
 import 'package:superlistas/presentation/views/main/main_screen.dart';
 import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 
@@ -175,31 +176,24 @@ class _HistorySliverAppBar extends ConsumerWidget {
   }
 }
 
-class _HistoryListItem extends ConsumerStatefulWidget {
+class _HistoryListItem extends ConsumerWidget {
   final ShoppingList list;
   const _HistoryListItem({required this.list});
 
   @override
-  ConsumerState<_HistoryListItem> createState() => _HistoryListItemState();
-}
-
-class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authViewModelProvider);
     if (currentUser == null) return const SizedBox.shrink();
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
     final isPremium = remoteConfig.isUserPremium;
-    final viewItemsEnabled = remoteConfig.isHistoryViewItemsEnabled;
     final reuseListEnabled = remoteConfig.isReuseListEnabled;
     final deleteHistoryEnabled = remoteConfig.isDeleteHistoryListEnabled;
 
     final userId = currentUser.id;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
     final headerColor = isDark ? Colors.white : scheme.onSurface;
 
@@ -229,236 +223,163 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            InkWell(
-              onTap: viewItemsEnabled
-                  ? () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              }
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline,
-                        color: scheme.secondary, size: 28),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.list.name,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: headerColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Concluída em: ${DateFormat('dd/MM/yyyy').format(widget.list.creationDate)}\n${widget.list.totalItems} itens',
-                            style: TextStyle(
-                                color: scheme.onSurfaceVariant, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (reuseListEnabled || deleteHistoryEnabled)
-                      PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, color: scheme.onSurface),
-                        onSelected: (value) async {
-                          if (value == 'reuse') {
-                            if (isPremium) {
-                              await ref
-                                  .read(historyViewModelProvider(userId)
-                                  .notifier)
-                                  .reuseList(widget.list);
-                              if (!context.mounted) return;
-                              ref.invalidate(shoppingListsProvider(userId));
-
-                              int listsTabIndex = 1;
-                              if (ref
-                                  .read(remoteConfigServiceProvider)
-                                  .isDashboardScreenEnabled ==
-                                  false) {
-                                listsTabIndex = 0;
-                              }
-                              ref.read(mainScreenIndexProvider.notifier).state =
-                                  listsTabIndex;
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(
-                                        'Lista "${widget.list.name}" reutilizada com sucesso!')),
-                              );
-                            } else {
-                              _showPremiumUpsell(context);
-                            }
-                          } else if (value == 'delete') {
-                            final bool? shouldDelete =
-                            await showGlassDialog<bool>(
-                              context: context,
-                              title: const Text('Confirmar Exclusão'),
-                              content: Text(
-                                  'Tem certeza de que deseja excluir permanentemente a lista "${widget.list.name}"?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text('Cancelar'),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: const Text('Excluir'),
-                                ),
-                              ],
-                            );
-                            if (shouldDelete == true) {
-                              await ref
-                                  .read(historyViewModelProvider(userId)
-                                  .notifier)
-                                  .deleteList(widget.list.id);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(
-                                        'Lista "${widget.list.name}" excluída.')),
-                              );
-                            }
-                          }
-                        },
-                        itemBuilder: (BuildContext context) {
-                          final theme = Theme.of(context);
-                          final iconColor = theme.colorScheme.onSurface
-                              .withAlpha((255 * 0.7).toInt());
-
-                          final List<PopupMenuEntry<String>> items = [];
-                          if (reuseListEnabled) {
-                            items.add(PopupMenuItem<String>(
-                              value: 'reuse',
-                              child: IconTheme(
-                                data: IconThemeData(color: iconColor),
-                                child: Row(
-                                  children: [
-                                    Icon(isPremium
-                                        ? Icons.copy_all_rounded
-                                        : Icons.lock_outline),
-                                    const SizedBox(width: 12),
-                                    const Text('Reutilizar Lista'),
-                                  ],
-                                ),
-                              ),
-                            ));
-                          }
-                          if (deleteHistoryEnabled) {
-                            items.add(PopupMenuItem<String>(
-                              value: 'delete',
-                              child: const IconTheme(
-                                data: IconThemeData(color: Colors.red),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete_forever_outlined),
-                                    SizedBox(width: 12),
-                                    Text('Excluir Permanente'),
-                                  ],
-                                ),
-                              ),
-                            ));
-                          }
-                          return items;
-                        },
-                      ),
-                  ],
-                ),
+        child: InkWell(
+          // MODIFICAÇÃO: Ao clicar, abre a tela de itens em modo leitura
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ListItemsScreen(shoppingListId: list.id),
               ),
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child:
-              _isExpanded ? _buildExpandedContent() : const SizedBox.shrink(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpandedContent() {
-    final itemsAsync = ref.watch(historyListItemsProvider(widget.list.id));
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final itemColor =
-    isDark ? Colors.white70 : scheme.onSurface.withAlpha((255 * 0.8).toInt());
-    final subItemColor = isDark
-        ? Colors.white54
-        : scheme.onSurfaceVariant.withAlpha((255 * 0.8).toInt());
-
-    return Container(
-      color: (isDark ? Colors.black : Colors.white).withAlpha((255 * 0.1).toInt()),
-      child: itemsAsync.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        error: (err, _) => Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(
-              child: Text('Erro ao carregar itens.',
-                  style: TextStyle(color: itemColor))),
-        ),
-        data: (items) {
-          if (items.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                  child: Text('Esta lista não tinha itens.',
-                      style: TextStyle(color: itemColor))),
             );
-          }
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              thickness: 1,
-              color:
-              (isDark ? Colors.white : scheme.primary).withAlpha((255 * 0.1).toInt()),
-              indent: 16,
-              endIndent: 16,
-            ),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return ListTile(
-                dense: true,
-                leading: Icon(
-                  item.isChecked
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
-                  color: item.isChecked ? scheme.secondary : itemColor,
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline,
+                    color: scheme.secondary, size: 28),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        list.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: headerColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Concluída em: ${DateFormat('dd/MM/yyyy').format(list.creationDate)}',
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant, fontSize: 12),
+                      ),
+                      Text(
+                        '${list.totalItems} itens • ${currencyFormat.format(list.totalCost)}',
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
                 ),
-                title: Text(item.name,
-                    style:
-                    TextStyle(color: itemColor, fontWeight: FontWeight.w500)),
-                subtitle: Text(
-                    '${NumberFormat().format(item.quantity)} ${item.unit}',
-                    style: TextStyle(color: subItemColor)),
-              );
-            },
-          );
-        },
+                if (reuseListEnabled || deleteHistoryEnabled)
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: scheme.onSurface),
+                    onSelected: (value) async {
+                      if (value == 'reuse') {
+                        if (isPremium) {
+                          await ref
+                              .read(historyViewModelProvider(userId)
+                              .notifier)
+                              .reuseList(list);
+                          if (!context.mounted) return;
+                          ref.invalidate(shoppingListsProvider(userId));
+
+                          int listsTabIndex = 1;
+                          if (ref
+                              .read(remoteConfigServiceProvider)
+                              .isDashboardScreenEnabled ==
+                              false) {
+                            listsTabIndex = 0;
+                          }
+                          ref.read(mainScreenIndexProvider.notifier).state =
+                              listsTabIndex;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Lista "${list.name}" reutilizada com sucesso!')),
+                          );
+                        } else {
+                          _showPremiumUpsell(context);
+                        }
+                      } else if (value == 'delete') {
+                        final bool? shouldDelete =
+                        await showGlassDialog<bool>(
+                          context: context,
+                          title: const Text('Confirmar Exclusão'),
+                          content: Text(
+                              'Tem certeza de que deseja excluir permanentemente a lista "${list.name}"?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(context).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () =>
+                                  Navigator.of(context).pop(true),
+                              child: const Text('Excluir'),
+                            ),
+                          ],
+                        );
+                        if (shouldDelete == true) {
+                          await ref
+                              .read(historyViewModelProvider(userId)
+                              .notifier)
+                              .deleteList(list.id);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Lista "${list.name}" excluída.')),
+                          );
+                        }
+                      }
+                    },
+                    itemBuilder: (BuildContext context) {
+                      final theme = Theme.of(context);
+                      final iconColor = theme.colorScheme.onSurface
+                          .withAlpha((255 * 0.7).toInt());
+
+                      final List<PopupMenuEntry<String>> items = [];
+                      if (reuseListEnabled) {
+                        items.add(PopupMenuItem<String>(
+                            value: 'reuse',
+                            child: IconTheme(
+                              data: IconThemeData(color: iconColor),
+                              child: Row(
+                                children: [
+                                  Icon(isPremium
+                                      ? Icons.copy_all_rounded
+                                      : Icons.lock_outline),
+                                  const SizedBox(width: 12),
+                                  const Text('Reutilizar Lista'),
+                                ],
+                              ),
+                            )));
+                      }
+                      if (deleteHistoryEnabled) {
+                        items.add(PopupMenuItem<String>(
+                            value: 'delete',
+                            child: const IconTheme(
+                              data: IconThemeData(color: Colors.red),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_forever_outlined),
+                                  SizedBox(width: 12),
+                                  Text('Excluir Permanente'),
+                                ],
+                              ),
+                            )));
+                      }
+                      return items;
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

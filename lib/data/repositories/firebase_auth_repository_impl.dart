@@ -19,4 +19,30 @@ class FirebaseAuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> signOut() => _service.signOut();
+
+  @override
+  Future<User?> signUpWithEmailAndPassword(String name, String email, String password) {
+    return _service.signUpWithEmailAndPassword(name, email, password);
+  }
+
+  @override
+  Future<User?> signInWithEmailAndPassword(String email, String password) {
+    return _service.signInWithEmailAndPassword(email, password);
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) {
+    return _service.sendPasswordResetEmail(email);
+  }
+
+  // --- IMPLEMENTAÇÃO DOS NOVOS MÉTODOS ---
+  @override
+  bool isPasswordProvider() {
+    return _service.isPasswordProvider();
+  }
+
+  @override
+  Future<void> reauthenticateAndDeleteAccount(String password) {
+    return _service.reauthenticateAndDeleteAccount(password);
+  }
 }

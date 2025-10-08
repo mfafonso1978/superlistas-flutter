@@ -2,15 +2,17 @@
 import 'package:superlistas/domain/entities/user.dart';
 
 abstract class AuthRepository {
-  // Uma stream que notifica sobre o estado de login (logado/deslogado).
   Stream<User?> get onAuthStateChanged;
-
-  // Obtém o usuário atualmente logado.
   User? get currentUser;
-
-  // Inicia o fluxo de login com o Google.
   Future<User?> signInWithGoogle();
-
-  // Faz o logout do usuário.
   Future<void> signOut();
+
+  Future<User?> signUpWithEmailAndPassword(String name, String email, String password);
+  Future<User?> signInWithEmailAndPassword(String email, String password);
+
+  Future<void> sendPasswordResetEmail(String email);
+
+  // --- NOVOS MÉTODOS NO CONTRATO ---
+  bool isPasswordProvider();
+  Future<void> reauthenticateAndDeleteAccount(String password);
 }

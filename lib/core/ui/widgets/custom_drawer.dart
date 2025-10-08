@@ -8,7 +8,7 @@ import 'package:superlistas/domain/entities/user.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/categories/categories_screen.dart';
 import 'package:superlistas/presentation/views/premium/premium_screen.dart';
-import 'package:superlistas/presentation/views/settings/settings_screen.dart';
+import 'package:superlistas/presentation/views/settings/settings_screen.dart' as settings;
 
 void _showPremiumUpsell(BuildContext context) {
   Navigator.of(context).push(
@@ -127,7 +127,7 @@ class CustomDrawer extends ConsumerWidget {
                           context,
                           icon: Icons.settings_rounded,
                           text: 'Configurações',
-                          onTap: () => _navigateTo(context, SettingsScreen()),
+                          onTap: () => _navigateTo(context, settings.SettingsScreen()),
                         ),
 
                       const Divider(
@@ -138,7 +138,7 @@ class CustomDrawer extends ConsumerWidget {
                         icon: Icons.logout,
                         text: 'Sair',
                         onTap: () async {
-                          Navigator.pop(context);
+                          // NÃO fecha o drawer antes do diálogo
                           final bool? confirm = await showGlassDialog<bool>(
                             context: context,
                             title: Row(
@@ -151,7 +151,7 @@ class CustomDrawer extends ConsumerWidget {
                             content: const Text('Tem certeza que deseja sair da sua conta?'),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
+                                onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
                                 child: const Text('Cancelar'),
                               ),
                               ElevatedButton(
@@ -159,12 +159,15 @@ class CustomDrawer extends ConsumerWidget {
                                   backgroundColor: scheme.error,
                                   foregroundColor: scheme.onError,
                                 ),
-                                onPressed: () => Navigator.of(context).pop(true),
+                                onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
                                 child: const Text('Sair'),
                               ),
                             ],
                           );
+
+                          // Só fecha o drawer e faz logout se o usuário confirmar
                           if (confirm == true) {
+                            Navigator.pop(context); // Fecha o drawer
                             ref.read(authViewModelProvider.notifier).signOut();
                           }
                         },

@@ -40,7 +40,6 @@ class ListItemsScreen extends ConsumerWidget {
       }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final Color glassColor =
     (isDark ? theme.colorScheme.surface : Colors.white).withAlpha((255 * 0.85).toInt());
 
@@ -104,6 +103,8 @@ class ListItemsScreen extends ConsumerWidget {
         final viewModel =
         ref.read(listItemsViewModelProvider(shoppingList.id).notifier);
 
+        final bool isReadOnly = shoppingList.isArchived;
+
         return Scaffold(
           backgroundColor: Colors.transparent,
           extendBodyBehindAppBar: true,
@@ -124,29 +125,26 @@ class ListItemsScreen extends ConsumerWidget {
                         shoppingList: shoppingList,
                         items: items,
                         viewModel: viewModel,
+                        isReadOnly: isReadOnly,
                       ),
-                      if (remoteConfig.isFinancialSummaryBarEnabled)
-                        SliverToBoxAdapter(
-                          child: _FinancialSummaryBar(
-                              shoppingList: shoppingList, totalCost: totalCost),
-                        ),
                       if (items.isEmpty)
-                        const SliverFillRemaining(
+                        SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
                             child: Padding(
-                              padding: EdgeInsets.all(16.0),
+                              padding: const EdgeInsets.all(16.0),
                               child: Text(
-                                'Nenhum item na lista. Adicione um!',
-                                style:
-                                TextStyle(color: Colors.white, fontSize: 16),
+                                isReadOnly
+                                    ? 'Esta lista não tinha itens.'
+                                    : 'Nenhum item na lista. Adicione um!',
+                                style: const TextStyle(color: Colors.white, fontSize: 16),
                               ),
                             ),
                           ),
                         )
                       else
                         _buildGroupedList(
-                            items, viewModel, shoppingList, totalCost),
+                            items, viewModel, shoppingList, totalCost, isReadOnly),
                       SliverPadding(
                         padding: EdgeInsets.only(
                             bottom:
@@ -158,7 +156,7 @@ class ListItemsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          floatingActionButton: addItemEnabled
+          floatingActionButton: (addItemEnabled && !isReadOnly)
               ? itemsAsync.when(
             data: (items) {
               final double totalCost =
@@ -167,22 +165,17 @@ class ListItemsScreen extends ConsumerWidget {
                   shoppingList.budget != null && shoppingList.budget! > 0;
               final bool budgetExceeded =
                   hasBudget && totalCost >= shoppingList.budget!;
-              return Container(
-                margin: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewPadding.bottom + 80,
-                ),
-                child: FloatingActionButton(
-                  onPressed: budgetExceeded
-                      ? null
-                      : () => _showItemFormModal(context, ref, shoppingList,
-                      currentTotalCost: totalCost),
-                  backgroundColor: budgetExceeded
-                      ? Colors.grey
-                      : Theme.of(context).colorScheme.secondary,
-                  // CORREÇÃO APLICADA AQUI
-                  shape: const CircleBorder(),
-                  child: const Icon(Icons.add),
-                ),
+
+              return FloatingActionButton(
+                onPressed: budgetExceeded
+                    ? null
+                    : () => _showItemFormModal(context, ref, shoppingList,
+                    currentTotalCost: totalCost),
+                backgroundColor: budgetExceeded
+                    ? Colors.grey
+                    : Theme.of(context).colorScheme.secondary,
+                shape: const CircleBorder(),
+                child: const Icon(Icons.add),
               );
             },
             loading: () => const SizedBox.shrink(),
@@ -200,6 +193,7 @@ class ListItemsScreen extends ConsumerWidget {
       ListItemsViewModel viewModel,
       ShoppingList shoppingList,
       double totalCost,
+      bool isReadOnly,
       ) {
     final groupedItems = _groupItems(items);
     final categoryNames = groupedItems.keys.toList();
@@ -210,16 +204,15 @@ class ListItemsScreen extends ConsumerWidget {
         final categoryName = categoryNames[index];
         final itemsInCategory = groupedItems[categoryName]!;
         final categoryIcon = itemsInCategory.first.category.icon;
-
         final double categorySubtotal =
         itemsInCategory.fold(0.0, (sum, item) => sum + item.subtotal);
+
         final currencyFormat =
         NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
         final formattedSubtotal = currencyFormat.format(categorySubtotal);
 
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
-
         final headerColor = isDark ? Colors.white : theme.colorScheme.primary;
         final subHeaderColor = theme.colorScheme.secondary;
 
@@ -227,7 +220,7 @@ class ListItemsScreen extends ConsumerWidget {
         for (int i = 0; i < itemsInCategory.length; i++) {
           final item = itemsInCategory[i];
           childrenWithDividers.add(
-            _buildItemTile(context, totalCost, item, viewModel, shoppingList),
+            _buildItemTile(context, totalCost, item, viewModel, shoppingList, isReadOnly),
           );
           if (i < itemsInCategory.length - 1) {
             childrenWithDividers.add(
@@ -290,11 +283,11 @@ class ListItemsScreen extends ConsumerWidget {
       Item item,
       ListItemsViewModel viewModel,
       ShoppingList shoppingList,
+      bool isReadOnly,
       ) {
     final currencyFormat =
     NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     final quantityFormat = NumberFormat();
-
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -312,14 +305,89 @@ class ListItemsScreen extends ConsumerWidget {
 
     return Consumer(builder: (context, ref, child) {
       final remoteConfig = ref.watch(remoteConfigServiceProvider);
-      final checkEnabled = remoteConfig.isCheckItemEnabled;
-      final editEnabled = remoteConfig.isEditItemEnabled;
-      final deleteEnabled = remoteConfig.isDeleteItemEnabled;
+      final checkEnabled = remoteConfig.isCheckItemEnabled && !isReadOnly;
+      final editEnabled = remoteConfig.isEditItemEnabled && !isReadOnly;
+      final deleteEnabled = remoteConfig.isDeleteItemEnabled && !isReadOnly;
 
       return Dismissible(
         key: Key(item.id),
         direction:
         deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
+        confirmDismiss: deleteEnabled
+            ? (direction) async {
+          final bool? shouldDelete = await showGlassDialog<bool>(
+            context: context,
+            title: const Row(
+              children: [
+                Icon(Icons.delete_forever_rounded, color: Colors.red),
+                SizedBox(width: 12),
+                Text('Excluir Item'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: DefaultTextStyle.of(context).style,
+                    children: [
+                      const TextSpan(text: 'Tem certeza que deseja excluir '),
+                      TextSpan(
+                        text: '"${item.name}"',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(text: '?'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Valor:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        currencyFormat.format(item.subtotal),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Excluir'),
+              ),
+            ],
+          );
+          return shouldDelete ?? false;
+        }
+            : null,
         background: Container(
           color: Colors.red,
           alignment: Alignment.centerRight,
@@ -386,23 +454,26 @@ class _ItemsSliverAppBar extends ConsumerWidget {
   final ShoppingList shoppingList;
   final List<Item> items;
   final ListItemsViewModel viewModel;
+  final bool isReadOnly;
 
   const _ItemsSliverAppBar({
     required this.shoppingList,
     required this.items,
     required this.viewModel,
+    required this.isReadOnly,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
     final isPremium = remoteConfig.isUserPremium;
-    final archiveEnabled = remoteConfig.isArchiveListEnabled;
-    final editListEnabled = remoteConfig.isEditListEnabled;
+    final archiveEnabled = remoteConfig.isArchiveListEnabled && !isReadOnly;
+    final editListEnabled = remoteConfig.isEditListEnabled && !isReadOnly;
     final analysisEnabled = remoteConfig.isListAnalysisScreenEnabled;
+    final reuseListEnabled = remoteConfig.isReuseListEnabled && isReadOnly;
+    final financialSummaryEnabled = remoteConfig.isFinancialSummaryBarEnabled;
 
     final checkedItemsCount = items.where((item) => item.isChecked).length;
     final bool isConcludeEnabled =
@@ -410,8 +481,15 @@ class _ItemsSliverAppBar extends ConsumerWidget {
 
     final Color foregroundColor = isDark ? Colors.white : Colors.black;
     final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
+
     final baseFontSize = theme.textTheme.headlineSmall?.fontSize ?? 24.0;
     final reducedFontSize = baseFontSize * 0.7;
+
+    // Calcular totais para a barra financeira
+    final double totalCost = items.fold(0.0, (sum, item) => sum + item.subtotal);
+    final double purchasedTotal = items
+        .where((item) => item.isChecked)
+        .fold(0.0, (sum, item) => sum + item.subtotal);
 
     return SliverAppBar(
       pinned: true,
@@ -421,17 +499,47 @@ class _ItemsSliverAppBar extends ConsumerWidget {
       actionsIconTheme: IconThemeData(color: foregroundColor),
       backgroundColor: backgroundColor,
       surfaceTintColor: backgroundColor,
-      title: Text(
-        shoppingList.name,
-        style: theme.textTheme.headlineSmall?.copyWith(
-          color: foregroundColor,
-          fontWeight: FontWeight.w800,
-          fontSize: reducedFontSize,
-        ),
-        overflow: TextOverflow.ellipsis,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              shoppingList.name,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: foregroundColor,
+                fontWeight: FontWeight.w800,
+                fontSize: reducedFontSize,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (isReadOnly)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline, size: 14, color: Colors.orange),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Somente Leitura',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
       actions: [
-        if (archiveEnabled || editListEnabled || analysisEnabled)
+        if (archiveEnabled || editListEnabled || analysisEnabled || reuseListEnabled)
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'complete') {
@@ -454,7 +562,6 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                     ),
                   ],
                 );
-
                 if (confirm == true) {
                   await viewModel.archiveList(shoppingList);
                   if (!context.mounted) return;
@@ -482,6 +589,23 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                 } else {
                   _showPremiumUpsell(context);
                 }
+              } else if (value == 'reuse') {
+                if (isPremium) {
+                  await ref
+                      .read(historyViewModelProvider(shoppingList.userId).notifier)
+                      .reuseList(shoppingList);
+                  if (!context.mounted) return;
+                  ref.invalidate(shoppingListsProvider(shoppingList.userId));
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(
+                            'Lista "${shoppingList.name}" reutilizada com sucesso!')),
+                  );
+                } else {
+                  _showPremiumUpsell(context);
+                }
               }
             },
             itemBuilder: (BuildContext context) {
@@ -490,37 +614,53 @@ class _ItemsSliverAppBar extends ConsumerWidget {
               theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
 
               final List<PopupMenuEntry<String>> menuItems = [];
+
+              if (reuseListEnabled) {
+                menuItems.add(PopupMenuItem<String>(
+                    value: 'reuse',
+                    child: IconTheme(
+                      data: IconThemeData(color: iconColor),
+                      child: Row(
+                        children: [
+                          Icon(isPremium ? Icons.copy_all_rounded : Icons.lock_outline),
+                          const SizedBox(width: 12),
+                          const Text('Reutilizar Lista'),
+                        ],
+                      ),
+                    )));
+              }
+
               if (archiveEnabled) {
                 menuItems.add(PopupMenuItem<String>(
-                  value: 'complete',
-                  enabled: isConcludeEnabled,
-                  child: IconTheme(
-                    data: IconThemeData(color: iconColor),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.archive_outlined),
-                        SizedBox(width: 12),
-                        Text('Concluir compra'),
-                      ],
-                    ),
-                  ),
-                ));
+                    value: 'complete',
+                    enabled: isConcludeEnabled,
+                    child: IconTheme(
+                      data: IconThemeData(color: iconColor),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.archive_outlined),
+                          SizedBox(width: 12),
+                          Text('Concluir compra'),
+                        ],
+                      ),
+                    )));
               }
+
               if (editListEnabled) {
                 menuItems.add(PopupMenuItem<String>(
-                  value: 'edit',
-                  child: IconTheme(
-                    data: IconThemeData(color: iconColor),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.edit_outlined),
-                        SizedBox(width: 12),
-                        Text('Editar Lista'),
-                      ],
-                    ),
-                  ),
-                ));
+                    value: 'edit',
+                    child: IconTheme(
+                      data: IconThemeData(color: iconColor),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.edit_outlined),
+                          SizedBox(width: 12),
+                          Text('Editar Lista'),
+                        ],
+                      ),
+                    )));
               }
+
               if (analysisEnabled) {
                 menuItems.add(PopupMenuItem<String>(
                     value: 'analysis',
@@ -535,10 +675,23 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                       ),
                     )));
               }
+
               return menuItems;
             },
           ),
       ],
+      // BARRA FINANCEIRA FIXA COM MESMA COR DA APPBAR
+      bottom: financialSummaryEnabled
+          ? PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: _FinancialSummaryBar(
+          shoppingList: shoppingList,
+          totalCost: totalCost,
+          purchasedTotal: purchasedTotal,
+          backgroundColor: backgroundColor,
+        ),
+      )
+          : null,
     );
   }
 }
@@ -546,112 +699,209 @@ class _ItemsSliverAppBar extends ConsumerWidget {
 class _FinancialSummaryBar extends StatelessWidget {
   final ShoppingList shoppingList;
   final double totalCost;
+  final double purchasedTotal;
+  final Color backgroundColor;
 
   const _FinancialSummaryBar({
     required this.shoppingList,
     required this.totalCost,
+    required this.purchasedTotal,
+    required this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-
     final currencyFormat =
     NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
     final bool hasBudget =
         shoppingList.budget != null && shoppingList.budget! > 0;
     final double balance = hasBudget ? shoppingList.budget! - totalCost : 0.0;
 
-    final Color backgroundColor = isDark ? scheme.surfaceVariant : Colors.grey.shade100;
-    final Color labelColor = isDark ? Colors.white70 : Colors.black54;
-    final Color valueColor = isDark ? Colors.white : Colors.black;
+    final Color totalBgColor = isDark
+        ? Colors.blue.shade900.withOpacity(0.3)
+        : Colors.blue.shade50;
+    final Color purchasedBgColor = isDark
+        ? Colors.teal.shade900.withOpacity(0.3)
+        : Colors.teal.shade50;
+    final Color budgetBgColor = isDark
+        ? Colors.purple.shade900.withOpacity(0.3)
+        : Colors.purple.shade50;
 
-    Color balanceColor;
+    Color balanceBgColor;
     if (balance < 0) {
-      balanceColor = Colors.red;
+      balanceBgColor = isDark
+          ? Colors.red.shade900.withOpacity(0.3)
+          : Colors.red.shade50;
     } else if (hasBudget && shoppingList.budget! > 0 && balance <= shoppingList.budget! * 0.10) {
-      balanceColor = Colors.red;
+      balanceBgColor = isDark
+          ? Colors.orange.shade900.withOpacity(0.3)
+          : Colors.orange.shade50;
     } else {
-      balanceColor = scheme.secondary; // Teal
+      balanceBgColor = isDark
+          ? Colors.green.shade900.withOpacity(0.3)
+          : Colors.green.shade50;
+    }
+
+    final Color labelColor = isDark ? Colors.white70 : Colors.black54;
+    final Color valueColor = isDark ? Colors.white : Colors.black87;
+
+    Color balanceValueColor;
+    if (balance < 0) {
+      balanceValueColor = Colors.red.shade700;
+    } else if (hasBudget && shoppingList.budget! > 0 && balance <= shoppingList.budget! * 0.10) {
+      balanceValueColor = Colors.orange.shade700;
+    } else {
+      balanceValueColor = Colors.green.shade700;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
       decoration: BoxDecoration(
         color: backgroundColor,
         border: Border(
             bottom: BorderSide(color: Colors.grey.withAlpha(80))),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: hasBudget
+          ? Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: totalBgColor,
+              icon: Icons.functions,
+              label: 'Total',
+              value: currencyFormat.format(totalCost),
+              labelColor: labelColor,
+              valueColor: valueColor,
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: purchasedBgColor,
+              icon: Icons.shopping_cart_checkout,
+              label: 'Comprado',
+              value: currencyFormat.format(purchasedTotal),
+              labelColor: labelColor,
+              valueColor: Colors.teal.shade700,
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: budgetBgColor,
+              icon: Icons.credit_card_outlined,
+              label: 'Limite',
+              value: currencyFormat.format(shoppingList.budget),
+              labelColor: labelColor,
+              valueColor: valueColor,
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: balanceBgColor,
+              icon: Icons.wallet_outlined,
+              label: 'Saldo',
+              value: currencyFormat.format(balance),
+              labelColor: labelColor,
+              valueColor: balanceValueColor,
+            ),
+          ),
+        ],
+      )
+          : Row(
+        children: [
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: totalBgColor,
+              icon: Icons.functions,
+              label: 'Total',
+              value: currencyFormat.format(totalCost),
+              labelColor: labelColor,
+              valueColor: valueColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: _FinancialInfoCard(
+              backgroundColor: purchasedBgColor,
+              icon: Icons.shopping_cart_checkout,
+              label: 'Comprado',
+              value: currencyFormat.format(purchasedTotal),
+              labelColor: labelColor,
+              valueColor: Colors.teal.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FinancialInfoCard extends StatelessWidget {
+  final Color backgroundColor;
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color labelColor;
+  final Color valueColor;
+
+  const _FinancialInfoCard({
+    required this.backgroundColor,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.labelColor,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: labelColor.withOpacity(0.2),
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Icon(Icons.functions, size: 14, color: labelColor),
-                  const SizedBox(width: 4),
-                  Text('Total',
-                      style: TextStyle(fontSize: 12, color: labelColor)),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                currencyFormat.format(totalCost),
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: valueColor),
+              Icon(icon, size: 12, color: labelColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 10, color: labelColor),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
-          if (hasBudget)
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.credit_card_outlined, size: 14, color: labelColor),
-                    const SizedBox(width: 4),
-                    Text('Limite',
-                        style: TextStyle(fontSize: 12, color: labelColor)),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  currencyFormat.format(shoppingList.budget),
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: valueColor),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: valueColor,
             ),
-          if (hasBudget)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.wallet_outlined, size: 14, color: labelColor),
-                    const SizedBox(width: 4),
-                    Text('Saldo',
-                        style: TextStyle(fontSize: 12, color: labelColor)),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  currencyFormat.format(balance),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: balanceColor,
-                  ),
-                ),
-              ],
-            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -678,7 +928,6 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
   late TextEditingController _priceController;
   late TextEditingController _quantityController;
   late TextEditingController _notesController;
-
   Category? _selectedCategory;
   String _selectedUnit = 'un';
   bool _isPurchased = false;
@@ -734,7 +983,6 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
         if (widget.item != null) {
           costDifference -= widget.item!.subtotal;
         }
-
         if (widget.currentTotalCost + costDifference > budget) {
           showGlassDialog(
             context: context,
@@ -759,7 +1007,6 @@ class _AddItemFormState extends ConsumerState<_AddItemForm> {
       } else {
         viewModel.updateItem(newItem);
       }
-
       Navigator.of(context).pop();
     }
   }
