@@ -57,7 +57,6 @@ class RemoteConfigService {
     'action_duplicate_list_enabled': true,
     'feature_templates_enabled': true,
     'feature_cloud_sync_enabled': true,
-    // <<< MUDANÇA: FLAG RENOMEADA PARA UM PROPÓSITO GERAL >>>
     'is_user_premium': false,
   };
 
@@ -66,7 +65,10 @@ class RemoteConfigService {
       await _remoteConfig.setDefaults(_defaults);
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: const Duration(minutes: 1),
+        // <<< CORREÇÃO APLICADA AQUI >>>
+        // Em modo debug, busca novas configs a cada 10 segundos.
+        // Em modo release (produção), busca a cada 1 hora.
+        minimumFetchInterval: kDebugMode ? const Duration(seconds: 10) : const Duration(hours: 1),
       ));
       await _remoteConfig.fetchAndActivate();
     } catch (e) {
@@ -77,8 +79,6 @@ class RemoteConfigService {
   }
 
   bool get isCloudSyncEnabled => _remoteConfig.getBool('feature_cloud_sync_enabled');
-
-  // <<< MUDANÇA: GETTER ATUALIZADO >>>
   bool get isUserPremium => _remoteConfig.getBool('is_user_premium');
 
   // Versioning
@@ -143,8 +143,8 @@ class RemoteConfigService {
   bool get isImportExportEnabled => _remoteConfig.getBool('feature_import_export_enabled');
   bool get isTemplatesEnabled => _remoteConfig.getBool('feature_templates_enabled');
 
-  // Units Features & Actions (assumindo que a tela de unidades pode ser controlada)
-  bool get isAddUnitEnabled => _remoteConfig.getBool('action_add_unit_enabled');
-  bool get isEditUnitEnabled => _remoteConfig.getBool('action_edit_unit_enabled');
-  bool get isDeleteUnitEnabled => _remoteConfig.getBool('action_delete_unit_enabled');
+  // A Lógica para estas flags de unidade precisa ser adicionada na UI se necessário
+  bool get isAddUnitEnabled => true;
+  bool get isEditUnitEnabled => true;
+  bool get isDeleteUnitEnabled => true;
 }

@@ -3,29 +3,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:superlistas/data/models/category_model.dart';
 import 'package:superlistas/data/models/item_model.dart';
 import 'package:superlistas/data/models/shopping_list_model.dart';
-import 'package:flutter/material.dart';
+import 'package:superlistas/data/models/user_model.dart';
 
 abstract class RemoteDataSource {
-  // Métodos para Listas de Compras
   Stream<List<ShoppingListModel>> getShoppingListsStream(String userId);
   Future<void> saveShoppingList(ShoppingListModel list);
   Future<void> deleteShoppingList(String listId, String userId);
+  Future<ShoppingListModel> getShoppingListById(String listId, String userId);
+  Future<String?> findUserUidByEmail(String email);
+  Future<List<UserModel>> getUsersFromIds(List<String> userIds);
+  Future<void> removeMemberFromList(String listId, String memberIdToRemove);
 
-  // Métodos para Itens
   Stream<List<ItemModel>> getItemsStream(String userId, String listId);
+  Future<List<ItemModel>> getItems(String listId); // <<< NOVO MÉTODO
   Future<void> saveItem(ItemModel item, String userId);
   Future<void> deleteItem(String itemId, String userId, String listId);
-
-  // Métodos para Categorias
   Stream<List<CategoryModel>> getCategoriesStream(String userId);
   Future<void> saveCategory(CategoryModel category, String userId);
   Future<void> deleteCategory(String categoryId, String userId);
-
-  // Métodos para Unidades de Medida
   Future<void> saveAllUnits(List<String> units, String userId);
   Future<List<String>> getAllUnits(String userId);
-
-  // Método para sincronização inicial
   Future<void> performInitialSync(String userId, Map<String, dynamic> localData);
   Future<void> deleteAllUserData(String userId);
 }
@@ -36,15 +33,19 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
   FirestoreDataSourceImpl({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  DocumentReference _userDoc(String userId) => _firestore.collection('users').doc(userId);
-  CollectionReference _shoppingListsCollection(String userId) => _userDoc(userId).collection('shopping_lists');
-  CollectionReference _itemsCollection(String userId, String listId) => _shoppingListsCollection(userId).doc(listId).collection('items');
+  CollectionReference get _usersCollection => _firestore.collection('users');
+  CollectionReference get _shoppingListsCollection => _firestore.collection('shopping_lists');
+  DocumentReference _userDoc(String userId) => _usersCollection.doc(userId);
+  CollectionReference _itemsCollection(String listId) => _shoppingListsCollection.doc(listId).collection('items');
   CollectionReference _categoriesCollection(String userId) => _userDoc(userId).collection('categories');
   DocumentReference _unitsDoc(String userId) => _userDoc(userId).collection('app_data').doc('units');
 
   @override
   Stream<List<ShoppingListModel>> getShoppingListsStream(String userId) {
-    return _shoppingListsCollection(userId).snapshots().map((snapshot) {
+    return _shoppingListsCollection
+        .where('members', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
       return snapshot.docs
           .map((doc) => ShoppingListModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
@@ -52,34 +53,89 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
   }
 
   @override
-  Future<void> saveShoppingList(ShoppingListModel list) {
-    return _shoppingListsCollection(list.userId).doc(list.id).set(list.toMap());
+  Future<List<UserModel>> getUsersFromIds(List<String> userIds) async {
+    if (userIds.isEmpty) return [];
+    final userDocs = await _usersCollection.where(FieldPath.documentId, whereIn: userIds).get();
+    return userDocs.docs.map((doc) => UserModel.fromFirestoreMap(doc.id, doc.data() as Map<String, dynamic>)).toList();
   }
 
   @override
-  Future<void> deleteShoppingList(String listId, String userId) {
-    return _shoppingListsCollection(userId).doc(listId).delete();
+  Future<ShoppingListModel> getShoppingListById(String listId, String userId) async {
+    final doc = await _shoppingListsCollection.doc(listId).get();
+    if (!doc.exists) {
+      throw Exception("Lista não encontrada.");
+    }
+    final model = ShoppingListModel.fromMap(doc.data() as Map<String, dynamic>);
+    if (!model.memberIds.contains(userId)) {
+      throw Exception("Acesso negado.");
+    }
+    return model;
+  }
+
+  @override
+  Future<String?> findUserUidByEmail(String email) async {
+    final querySnapshot = await _usersCollection
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return querySnapshot.docs.first.id;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveShoppingList(ShoppingListModel list) {
+    return _shoppingListsCollection.doc(list.id).set(list.toFirestoreMap());
+  }
+
+  @override
+  Future<void> removeMemberFromList(String listId, String memberIdToRemove) {
+    return _shoppingListsCollection.doc(listId).update({
+      'members': FieldValue.arrayRemove([memberIdToRemove])
+    });
+  }
+
+  @override
+  Future<void> deleteShoppingList(String listId, String userId) async {
+    final itemsSnapshot = await _itemsCollection(listId).get();
+    final batch = _firestore.batch();
+    for (var doc in itemsSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_shoppingListsCollection.doc(listId));
+    return batch.commit();
   }
 
   @override
   Stream<List<ItemModel>> getItemsStream(String userId, String listId) {
-    return _itemsCollection(userId, listId).snapshots().map((snapshot) {
+    return _itemsCollection(listId).snapshots().map((snapshot) {
       return snapshot.docs
           .map((doc) => ItemModel.fromJoinedMap(doc.data() as Map<String, dynamic>))
           .toList();
     });
   }
 
+  // <<< NOVA IMPLEMENTAÇÃO >>>
+  @override
+  Future<List<ItemModel>> getItems(String listId) async {
+    final snapshot = await _itemsCollection(listId).get();
+    return snapshot.docs
+        .map((doc) => ItemModel.fromJoinedMap(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
   @override
   Future<void> saveItem(ItemModel item, String userId) {
-    return _itemsCollection(userId, item.shoppingListId)
+    return _itemsCollection(item.shoppingListId)
         .doc(item.id)
         .set(item.toMapForFirestore());
   }
 
   @override
   Future<void> deleteItem(String itemId, String userId, String listId) {
-    return _itemsCollection(userId, listId).doc(itemId).delete();
+    return _itemsCollection(listId).doc(itemId).delete();
   }
 
   @override
@@ -127,11 +183,11 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
     final List<ShoppingListModel> lists = localData['shopping_lists'];
     final List<ItemModel> allItems = localData['items'];
     for (final list in lists) {
-      final docRef = _shoppingListsCollection(userId).doc(list.id);
-      batch.set(docRef, list.toMap());
+      final docRef = _shoppingListsCollection.doc(list.id);
+      batch.set(docRef, list.toFirestoreMap());
       final itemsForThisList = allItems.where((item) => item.shoppingListId == list.id);
       for (final item in itemsForThisList) {
-        final itemDocRef = _itemsCollection(userId, list.id).doc(item.id);
+        final itemDocRef = _itemsCollection(list.id).doc(item.id);
         batch.set(itemDocRef, item.toMapForFirestore());
       }
     }
@@ -146,20 +202,24 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
   @override
   Future<void> deleteAllUserData(String userId) async {
     final batch = _firestore.batch();
-    final shoppingListsSnapshot = await _shoppingListsCollection(userId).get();
-    for (final doc in shoppingListsSnapshot.docs) {
-      final itemsSnapshot = await _itemsCollection(userId, doc.id).get();
+
+    final ownedListsSnapshot = await _shoppingListsCollection.where('ownerId', isEqualTo: userId).get();
+    for (final doc in ownedListsSnapshot.docs) {
+      final itemsSnapshot = await _itemsCollection(doc.id).get();
       for (final itemDoc in itemsSnapshot.docs) {
         batch.delete(itemDoc.reference);
       }
       batch.delete(doc.reference);
     }
+
     final categoriesSnapshot = await _categoriesCollection(userId).get();
     for (final doc in categoriesSnapshot.docs) {
       batch.delete(doc.reference);
     }
-    final unitsDoc = _unitsDoc(userId);
-    batch.delete(unitsDoc);
+
+    batch.delete(_unitsDoc(userId));
+    batch.delete(_userDoc(userId));
+
     await batch.commit();
   }
 }
@@ -179,7 +239,7 @@ extension ItemModelFirestore on ItemModel {
       'categoryId': category.id,
       'categoryName': category.name,
       'categoryIconCodePoint': category.icon.codePoint,
-      'categoryColorValue': category.colorValue.value,
+      'categoryColorValue': category.colorValue,
     };
   }
 }

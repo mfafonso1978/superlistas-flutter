@@ -8,6 +8,10 @@ import 'package:superlistas/core/ui/widgets/currency_input_formatter.dart';
 import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
+import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
+
+// --- WIDGET 1: GlassAppBar ---
+// ... (código do GlassAppBar, GlassCard, e Indicator permanece o mesmo) ...
 
 // --- WIDGET 1: GlassAppBar ---
 class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -22,7 +26,6 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     final Color foregroundColor = isDark ? Colors.white : Colors.black;
     final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
 
-    // Pega o tamanho da fonte base do tema e aplica a redução
     final baseFontSize = theme.textTheme.titleLarge?.fontSize ?? 22.0;
     final reducedFontSize = baseFontSize * 0.7;
 
@@ -119,6 +122,7 @@ class Indicator extends StatelessWidget {
   }
 }
 
+
 void showAddOrEditListDialog(
     {required BuildContext context,
       required WidgetRef ref,
@@ -179,32 +183,64 @@ void showAddOrEditListDialog(
         child: const Text('Cancelar'),
       ),
       ElevatedButton(
-        onPressed: () {
+        onPressed: () async {
           if (nameController.text.isEmpty) return;
-          final budgetText =
-          budgetController.text.replaceAll('.', '').replaceAll(',', '.');
-          final budget = double.tryParse(budgetText);
 
-          if (isEditMode) {
-            ref
-                .read(shoppingListsViewModelProvider(userId).notifier)
-                .updateList(
-              list!,
-              nameController.text,
-              budget: budget,
-            );
-            ref.invalidate(singleListProvider(list.id));
-          } else {
-            ref
-                .read(shoppingListsViewModelProvider(userId).notifier)
-                .addList(
-              nameController.text,
-              budget: budget,
-            );
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (c) => const Center(child: CircularProgressIndicator()),
+          );
+
+          try {
+            final budgetText =
+            budgetController.text.replaceAll('.', '').replaceAll(',', '.');
+            final budget = double.tryParse(budgetText);
+
+            if (isEditMode) {
+              await ref
+                  .read(shoppingListsViewModelProvider(userId).notifier)
+                  .updateList(
+                list!,
+                nameController.text,
+                budget: budget,
+              );
+
+              if (context.mounted) {
+                Navigator.of(context, rootNavigator: true).pop(); // Fecha o loading
+                Navigator.of(context).pop(); // Fecha o diálogo de edição
+              }
+
+            } else {
+              // <<< MUDANÇA 2: Captura o ID da nova lista e navega >>>
+              final String newListId = await ref
+                  .read(shoppingListsViewModelProvider(userId).notifier)
+                  .addList(
+                nameController.text,
+                budget: budget,
+              );
+
+              if (context.mounted) {
+                Navigator.of(context, rootNavigator: true).pop(); // Fecha o loading
+                Navigator.of(context).pop(); // Fecha o diálogo de adicionar
+
+                // Navega para a nova tela de itens
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ListItemsScreen(shoppingListId: newListId),
+                  ),
+                );
+              }
+            }
+
+          } catch (e) {
+            if (context.mounted) {
+              Navigator.of(context, rootNavigator: true).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Ocorreu um erro: $e"), backgroundColor: Colors.red),
+              );
+            }
           }
-
-          ref.invalidate(dashboardViewModelProvider(userId));
-          Navigator.of(context).pop();
         },
         child: const Text('Salvar'),
       ),

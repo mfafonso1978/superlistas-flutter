@@ -12,6 +12,7 @@ import 'package:superlistas/data/models/shopping_list_model.dart';
 import 'package:superlistas/data/models/sync_operation_model.dart';
 import 'package:superlistas/domain/entities/category.dart' as domain;
 import 'package:superlistas/domain/entities/item.dart';
+import 'package:superlistas/domain/entities/member.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/stats_data.dart';
 import 'package:superlistas/domain/repositories/shopping_list_repository.dart';
@@ -41,16 +42,154 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
   @override
   Stream<List<ShoppingList>> getShoppingListsStream(String userId) {
     if (_shouldSync()) {
-      return remoteDataSource.getShoppingListsStream(userId).asyncMap((remoteLists) async {
+      return remoteDataSource.getShoppingListsStream(userId).asyncMap((listModels) async {
+
+        final allMemberIds = listModels.expand((list) => list.memberIds).toSet().toList();
+        final userModels = await remoteDataSource.getUsersFromIds(allMemberIds);
+        final userMap = {for (var user in userModels) user.id: user};
+
+        // Usa Future.wait para buscar os itens de todas as listas em paralelo
+        final listsWithItems = await Future.wait(listModels.map((listModel) async {
+          final items = await remoteDataSource.getItems(listModel.id);
+          final members = listModel.memberIds.map((uid) {
+            final user = userMap[uid];
+            return Member(
+              uid: uid,
+              name: user?.name ?? 'Usuário',
+              photoUrl: user?.photoUrl,
+            );
+          }).toList();
+
+          // Cria a entidade final com os totais calculados
+          return ShoppingList(
+            id: listModel.id,
+            name: listModel.name,
+            creationDate: listModel.creationDate,
+            isArchived: listModel.isArchived,
+            budget: listModel.budget,
+            ownerId: listModel.ownerId,
+            members: members,
+            totalItems: items.length,
+            checkedItems: items.where((i) => i.isChecked).length,
+            totalCost: items.fold(0.0, (sum, item) => sum + item.subtotal),
+          );
+        }));
+
         await localDataSource.deleteAllShoppingListsForUser(userId);
-        for (final list in remoteLists) {
-          await localDataSource.addShoppingList(list);
+        for (final list in listsWithItems) {
+          final modelToSave = ShoppingListModel(
+            id: list.id,
+            name: list.name,
+            creationDate: list.creationDate,
+            isArchived: list.isArchived,
+            budget: list.budget,
+            ownerId: list.ownerId,
+            memberIds: list.members.map((m) => m.uid).toList(),
+          );
+          await localDataSource.addShoppingList(modelToSave);
         }
-        final richListMaps = await localDataSource.getRichShoppingListsForUser(userId);
-        return richListMaps.map((map) => ShoppingList.fromRichMap(map)).toList();
+
+        return listsWithItems;
       });
     } else {
       return Stream.fromFuture(getShoppingLists(userId));
+    }
+  }
+
+  @override
+  Future<void> shareList({required String listId, required String newMemberEmail}) async {
+    if (!_shouldSync()) {
+      throw Exception("O compartilhamento de listas requer a Sincronização na Nuvem (Premium).");
+    }
+
+    final currentUserId = _getCurrentUserIdAuth();
+    if (currentUserId == null) throw Exception("Usuário não autenticado.");
+
+    try {
+      final newMemberUid = await remoteDataSource.findUserUidByEmail(newMemberEmail);
+      if (newMemberUid == null) {
+        throw Exception("Nenhum usuário encontrado com este e-mail.");
+      }
+
+      if(newMemberUid == currentUserId) {
+        throw Exception("Você não pode compartilhar uma lista com você mesmo.");
+      }
+
+      final listToShare = await remoteDataSource.getShoppingListById(listId, currentUserId);
+
+      if(listToShare.memberIds.contains(newMemberUid)) {
+        throw Exception("Este usuário já é um membro da lista.");
+      }
+
+      final updatedMembers = List<String>.from(listToShare.memberIds)..add(newMemberUid);
+
+      final updatedListModel = ShoppingListModel(
+        id: listToShare.id,
+        name: listToShare.name,
+        creationDate: listToShare.creationDate,
+        isArchived: listToShare.isArchived,
+        budget: listToShare.budget,
+        ownerId: listToShare.ownerId,
+        memberIds: updatedMembers,
+      );
+
+      await remoteDataSource.saveShoppingList(updatedListModel);
+
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> removeMember({required String listId, required String memberIdToRemove}) async {
+    if (!_shouldSync()) {
+      throw Exception("A remoção de membros requer a Sincronização na Nuvem (Premium).");
+    }
+
+    final currentUserId = _getCurrentUserIdAuth();
+    if (currentUserId == null) throw Exception("Usuário não autenticado.");
+
+    try {
+      final listToUpdate = await remoteDataSource.getShoppingListById(listId, currentUserId);
+
+      if (currentUserId != listToUpdate.ownerId) {
+        throw Exception("Apenas o proprietário pode remover membros.");
+      }
+
+      if (memberIdToRemove == listToUpdate.ownerId) {
+        throw Exception("O proprietário não pode ser removido da lista.");
+      }
+
+      if (!listToUpdate.memberIds.contains(memberIdToRemove)) {
+        throw Exception("Este usuário não é membro da lista.");
+      }
+
+      await remoteDataSource.removeMemberFromList(listId, memberIdToRemove);
+
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> leaveList({required String listId}) async {
+    if (!_shouldSync()) {
+      throw Exception("Sair de listas requer a Sincronização na Nuvem (Premium).");
+    }
+
+    final currentUserId = _getCurrentUserIdAuth();
+    if (currentUserId == null) throw Exception("Usuário não autenticado.");
+
+    try {
+      final listToLeave = await remoteDataSource.getShoppingListById(listId, currentUserId);
+
+      if (currentUserId == listToLeave.ownerId) {
+        throw Exception("O proprietário não pode sair da própria lista. Você pode excluí-la.");
+      }
+
+      await remoteDataSource.removeMemberFromList(listId, currentUserId);
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -77,24 +216,73 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
 
   @override
   Future<ShoppingList> getShoppingListById(String id) async {
+    final currentUserId = _getCurrentUserIdAuth();
+    if (_shouldSync() && currentUserId != null) {
+      final listModel = await remoteDataSource.getShoppingListById(id, currentUserId);
+      final userModels = await remoteDataSource.getUsersFromIds(listModel.memberIds);
+      final userMap = {for (var user in userModels) user.id: user};
+      final members = listModel.memberIds.map((uid) {
+        final user = userMap[uid];
+        return Member(uid: uid, name: user?.name ?? 'Usuário', photoUrl: user?.photoUrl);
+      }).toList();
+
+      final items = await getItems(id);
+      final totalCost = items.fold(0.0, (sum, item) => sum + item.subtotal);
+
+      return ShoppingList(
+          id: listModel.id,
+          name: listModel.name,
+          creationDate: listModel.creationDate,
+          isArchived: listModel.isArchived,
+          budget: listModel.budget,
+          ownerId: listModel.ownerId,
+          members: members,
+          totalItems: items.length,
+          checkedItems: items.where((i) => i.isChecked).length,
+          totalCost: totalCost
+      );
+    }
+
     final model = await localDataSource.getShoppingListById(id);
     if (model == null) throw Exception('Lista não encontrada com o ID: $id');
     final totalItems = await localDataSource.countTotalItems(model.id);
     final checkedItems = await localDataSource.countCheckedItems(model.id);
     final totalCost = await localDataSource.getTotalCostOfList(model.id);
-    return ShoppingList(id: model.id, name: model.name, creationDate: model.creationDate, isArchived: model.isArchived, budget: model.budget, userId: model.userId, totalItems: totalItems, checkedItems: checkedItems, totalCost: totalCost);
+    return ShoppingList(
+      id: model.id,
+      name: model.name,
+      creationDate: model.creationDate,
+      isArchived: model.isArchived,
+      budget: model.budget,
+      ownerId: model.ownerId,
+      members: model.members,
+      totalItems: totalItems,
+      checkedItems: checkedItems,
+      totalCost: totalCost,
+    );
   }
 
   @override
   Future<void> createShoppingList(ShoppingList list) async {
-    final listModel = ShoppingListModel(id: list.id, name: list.name, creationDate: list.creationDate, isArchived: list.isArchived, budget: list.budget, userId: list.userId);
+    final listModel = ShoppingListModel(
+      id: list.id,
+      name: list.name,
+      creationDate: list.creationDate,
+      isArchived: list.isArchived,
+      budget: list.budget,
+      ownerId: list.ownerId,
+      memberIds: [list.ownerId],
+    );
+
     await localDataSource.addShoppingList(listModel);
+
     if (_shouldSync()) {
       try { await remoteDataSource.saveShoppingList(listModel); } catch (e) {
         if (kDebugMode) { print("Falha na sincronização, adicionando à fila: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: list.userId, entityType: 'shopping_list', entityId: list.id,
-          operationType: 'save', payload: jsonEncode(listModel.toMap()),
+          userId: list.ownerId, entityType: 'shopping_list', entityId: list.id,
+          operationType: 'save',
+          payload: jsonEncode(listModel.toFirestoreMap()),
           timestamp: DateTime.now(),
         ));
       }
@@ -103,14 +291,23 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
 
   @override
   Future<void> updateShoppingList(ShoppingList list) async {
-    final listModel = ShoppingListModel(id: list.id, name: list.name, creationDate: list.creationDate, isArchived: list.isArchived, budget: list.budget, userId: list.userId);
+    final listModel = ShoppingListModel(
+      id: list.id,
+      name: list.name,
+      creationDate: list.creationDate,
+      isArchived: list.isArchived,
+      budget: list.budget,
+      ownerId: list.ownerId,
+      memberIds: list.members.map((m) => m.uid).toList(),
+    );
     await localDataSource.updateShoppingList(listModel);
     if (_shouldSync()) {
       try { await remoteDataSource.saveShoppingList(listModel); } catch (e) {
         if (kDebugMode) { print("Falha na sincronização, adicionando à fila: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: list.userId, entityType: 'shopping_list', entityId: list.id,
-          operationType: 'save', payload: jsonEncode(listModel.toMap()),
+          userId: list.ownerId, entityType: 'shopping_list', entityId: list.id,
+          operationType: 'save',
+          payload: jsonEncode(listModel.toFirestoreMap()),
           timestamp: DateTime.now(),
         ));
       }
@@ -123,10 +320,10 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
     if (list == null) return;
     await localDataSource.deleteShoppingList(id);
     if (_shouldSync()) {
-      try { await remoteDataSource.deleteShoppingList(id, list.userId); } catch (e) {
+      try { await remoteDataSource.deleteShoppingList(id, list.ownerId); } catch (e) {
         if (kDebugMode) { print("Falha na sincronização, adicionando à fila: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: list.userId, entityType: 'shopping_list', entityId: id,
+          userId: list.ownerId, entityType: 'shopping_list', entityId: id,
           operationType: 'delete', timestamp: DateTime.now(),
         ));
       }
@@ -136,10 +333,15 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
   @override
   Future<void> reuseShoppingList(ShoppingList listToReuse) async {
     const uuid = Uuid();
+    final currentUserId = _getCurrentUserIdAuth();
+    if(currentUserId == null) throw Exception("Usuário não autenticado para reutilizar lista.");
+
     final newList = ShoppingList(
       id: uuid.v4(), name: '${listToReuse.name} (cópia)',
       creationDate: DateTime.now(), isArchived: false,
-      budget: listToReuse.budget, userId: listToReuse.userId,
+      budget: listToReuse.budget,
+      ownerId: currentUserId,
+      members: [Member(uid: currentUserId, name: 'Você')],
     );
     await createShoppingList(newList);
 
@@ -157,6 +359,9 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
 
   @override
   Future<List<Item>> getItems(String listId) async {
+    if (_shouldSync()) {
+      return await remoteDataSource.getItems(listId);
+    }
     final itemModels = await localDataSource.getItemsFromList(listId);
     return itemModels.cast<Item>().toList();
   }
@@ -174,10 +379,10 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
     );
     await localDataSource.addItem(itemModel);
     if (_shouldSync()) {
-      try { await remoteDataSource.saveItem(itemModel, list.userId); } catch (e) {
+      try { await remoteDataSource.saveItem(itemModel, list.ownerId); } catch (e) {
         if (kDebugMode) { print("Falha na sincronização, adicionando à fila: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: list.userId, entityType: 'item', entityId: item.id,
+          userId: list.ownerId, entityType: 'item', entityId: item.id,
           operationType: 'save', payload: jsonEncode(itemModel.toMapForFirestore()),
           timestamp: DateTime.now(),
         ));
@@ -198,10 +403,10 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
     );
     await localDataSource.updateItem(itemModel);
     if (_shouldSync()) {
-      try { await remoteDataSource.saveItem(itemModel, list.userId); } catch (e) {
+      try { await remoteDataSource.saveItem(itemModel, list.ownerId); } catch (e) {
         if (kDebugMode) { print("Falha na sincronização, adicionando à fila: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: list.userId, entityType: 'item', entityId: item.id,
+          userId: list.ownerId, entityType: 'item', entityId: item.id,
           operationType: 'save', payload: jsonEncode(itemModel.toMapForFirestore()),
           timestamp: DateTime.now(),
         ));
@@ -210,14 +415,14 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
   }
 
   @override
-  Future<void> deleteItem(String itemId, String listId, String userId) async {
+  Future<void> deleteItem(String itemId, String listId, String ownerId) async {
     await localDataSource.deleteItem(itemId);
     if (_shouldSync()) {
-      try { await remoteDataSource.deleteItem(itemId, userId, listId); }
+      try { await remoteDataSource.deleteItem(itemId, ownerId, listId); }
       catch (e) {
         if (kDebugMode) { print("Falha na sincronização de exclusão de item: $e"); }
         await localDataSource.addToSyncQueue(SyncOperationModel(
-          userId: userId,
+          userId: ownerId,
           entityType: 'item',
           entityId: itemId,
           operationType: 'delete',
@@ -313,7 +518,7 @@ class ShoppingListRepositoryImpl implements ShoppingListRepository {
     final shoppingLists = await localDataSource.getAllShoppingListsForUser(userId);
     final items = await localDataSource.getAllItemsForUser(userId);
     final categoriesMap = categories.map((c) => c.toMap()).toList();
-    final listsMap = shoppingLists.map((l) => l.toMap()).toList();
+    final listsMap = shoppingLists.map((l) => l.toDbMap()).toList();
     final itemsMap = items.map((i) => i.toMap()).toList();
     final exportData = {
       'metadata': { 'version': 1, 'exportedAt': DateTime.now().toIso8601String(), 'appName': 'Superlistas', },

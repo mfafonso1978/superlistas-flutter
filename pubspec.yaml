@@ -25,6 +25,7 @@ dependencies:
   auto_size_text: ^3.0.0
   share_plus: ^9.0.0
   file_selector: ^1.0.3
+  lottie: ^3.1.0
 
   # <<< MUDANÇA PRINCIPAL AQUI: Pacotes Firebase atualizados para compatibilidade >>>
   firebase_core: ^3.1.1
@@ -49,6 +50,7 @@ flutter:
     - assets/
     - assets/launcher_icon/
     - assets/images/
+    - assets/animations/
 
 flutter_launcher_icons:
   android: "launcher_icon"

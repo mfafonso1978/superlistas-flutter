@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superlistas/domain/entities/item.dart';
+import 'package:superlistas/domain/entities/member.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/repositories/shopping_list_repository.dart';
 import 'package:superlistas/presentation/providers/providers.dart';
@@ -13,28 +14,38 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
   final String _userId;
 
   ShoppingListsViewModel(this.ref, this._repository, this._userId)
-      : super(const AsyncValue.data([])); // Apenas para ações, estado inicial vazio
+      : super(const AsyncValue.data([]));
 
-  Future<void> addList(String name, {double? budget}) async {
+  void _invalidateAllProviders() {
+    ref.invalidate(shoppingListsStreamProvider(_userId));
+    ref.invalidate(dashboardViewModelProvider(_userId));
+    ref.invalidate(historyViewModelProvider(_userId));
+  }
+
+  Future<String> addList(String name, {double? budget}) async {
+    final currentUser = ref.read(authViewModelProvider);
+    final newMember = Member(
+      uid: _userId,
+      name: currentUser?.name ?? 'Você',
+      photoUrl: currentUser?.photoUrl,
+    );
+
     final newList = ShoppingList(
       id: const Uuid().v4(),
       name: name,
       creationDate: DateTime.now(),
       budget: budget,
-      userId: _userId,
-      totalItems: 0,
-      checkedItems: 0,
-      totalCost: 0.0,
+      ownerId: _userId,
+      members: [newMember],
     );
 
     try {
       await _repository.createShoppingList(newList);
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
-      ref.invalidate(dashboardViewModelProvider(_userId));
+      _invalidateAllProviders();
+      return newList.id;
     } catch (e) {
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
+      _invalidateAllProviders();
+      rethrow;
     }
   }
 
@@ -42,12 +53,9 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
     final updatedList = list.copyWith(name: newName, budget: budget);
     try {
       await _repository.updateShoppingList(updatedList);
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
-      ref.invalidate(dashboardViewModelProvider(_userId));
+      _invalidateAllProviders();
     } catch (e) {
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
+      _invalidateAllProviders();
     }
   }
 
@@ -55,10 +63,7 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
     try {
       final listToArchive = list.copyWith(isArchived: true);
       await _repository.updateShoppingList(listToArchive);
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
-      ref.invalidate(historyViewModelProvider(_userId));
-      ref.invalidate(dashboardViewModelProvider(_userId));
+      _invalidateAllProviders();
     } catch (e, s) {
       state = AsyncValue.error(e, s);
     }
@@ -67,14 +72,25 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
   Future<void> deleteList(String id) async {
     try {
       await _repository.deleteShoppingList(id);
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
-      ref.invalidate(historyViewModelProvider(_userId));
-      ref.invalidate(dashboardViewModelProvider(_userId));
+      _invalidateAllProviders();
     } catch (e) {
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
+      _invalidateAllProviders();
     }
+  }
+
+  Future<void> shareList({required String listId, required String email}) async {
+    await _repository.shareList(listId: listId, newMemberEmail: email);
+    _invalidateAllProviders();
+  }
+
+  Future<void> removeMember({required String listId, required String memberIdToRemove}) async {
+    await _repository.removeMember(listId: listId, memberIdToRemove: memberIdToRemove);
+    _invalidateAllProviders();
+    ref.invalidate(singleListProvider(listId));
+  }
+  Future<void> leaveList({required String listId}) async {
+    await _repository.leaveList(listId: listId);
+    _invalidateAllProviders();
   }
 
   Future<String> _createEmptyList({
@@ -82,12 +98,20 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
     double? budget,
   }) async {
     final newId = const Uuid().v4();
+    final currentUser = ref.read(authViewModelProvider);
+    final newMember = Member(
+      uid: _userId,
+      name: currentUser?.name ?? 'Você',
+      photoUrl: currentUser?.photoUrl,
+    );
+
     final newList = ShoppingList(
       id: newId,
       name: name,
       creationDate: DateTime.now(),
       budget: budget,
-      userId: _userId,
+      ownerId: _userId,
+      members: [newMember],
     );
     await _repository.createShoppingList(newList);
     return newId;
@@ -114,8 +138,7 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
         );
         await _repository.createItem(cloned, newListId);
       }
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
+      _invalidateAllProviders();
       return newListId;
     } catch (e, s) {
       state = AsyncValue.error(e, s);
@@ -169,8 +192,7 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
           await _repository.createItem(cloned, newListId);
         }
       }
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
+      _invalidateAllProviders();
       return newListId;
     } catch (e, s) {
       state = AsyncValue.error(e, s);
@@ -180,7 +202,7 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
 
   Future<int> archiveCompletedLists() async {
     try {
-      final all = await _repository.getShoppingLists(_userId);
+      final all = await ref.read(shoppingListsStreamProvider(_userId).future);
       final toArchive = all.where((l) => l.isCompleted && !l.isArchived).toList();
       if (toArchive.isEmpty) return 0;
 
@@ -188,9 +210,7 @@ class ShoppingListsViewModel extends StateNotifier<AsyncValue<List<ShoppingList>
         final updated = l.copyWith(isArchived: true);
         await _repository.updateShoppingList(updated);
       }
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(_userId));
-      ref.invalidate(historyViewModelProvider(_userId));
+      _invalidateAllProviders();
       return toArchive.length;
     } catch (e, s) {
       state = AsyncValue.error(e, s);

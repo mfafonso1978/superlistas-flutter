@@ -1,4 +1,5 @@
 // lib/data/datasources/local_datasource.dart
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:superlistas/core/database/database_helper.dart';
 import 'package:superlistas/data/models/category_model.dart';
@@ -8,29 +9,22 @@ import 'package:superlistas/data/models/sync_operation_model.dart';
 import 'package:superlistas/data/models/user_model.dart';
 
 abstract class LocalDataSource {
-  // --- Métodos de Usuário ---
   Future<void> signUp(UserModel user);
   Future<UserModel?> getUserByEmail(String email);
   Future<UserModel?> getUserById(String id);
   Future<List<UserModel>> getAllUsers();
   Future<int> updateUserPassword(String email, String newPassword);
-
-  // --- Métodos para Categorias ---
   Future<void> addCategory(CategoryModel category);
   Future<List<CategoryModel>> getAllCategories();
   Future<CategoryModel> getCategoryById(String id);
   Future<int> updateCategory(CategoryModel category);
   Future<int> deleteCategory(String id);
-
-  // --- Métodos para Listas de Compras ---
   Future<void> addShoppingList(ShoppingListModel shoppingList);
   Future<List<ShoppingListModel>> getAllShoppingListsForUser(String userId);
   Future<ShoppingListModel?> getShoppingListById(String id);
   Future<int> updateShoppingList(ShoppingListModel shoppingList);
   Future<int> deleteShoppingList(String id);
   Future<void> deleteAllShoppingListsForUser(String userId);
-
-  // --- Métodos para Itens ---
   Future<void> addItem(ItemModel item);
   Future<List<ItemModel>> getItemsFromList(String shoppingListId);
   Future<int> updateItem(ItemModel item);
@@ -42,19 +36,13 @@ abstract class LocalDataSource {
   Future<List<ItemModel>> getAllItemsForUser(String userId);
   Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(String userId);
   Future<void> deleteAllItemsFromList(String shoppingListId);
-
-  // --- Métodos de Importação/Exportação e Sincronização ---
   Future<void> performImport(String userId, Map<String, dynamic> data);
   Future<Map<String, dynamic>> getAllDataForUser(String userId);
   Future<void> deleteAllUserData(String userId);
-
-  // --- Métodos para Unidades ---
   Future<List<String>> getAllUnits();
   Future<void> addUnit(String name);
   Future<int> deleteUnit(String name);
   Future<int> updateUnit(String oldName, String newName);
-
-  // --- Métodos para a Fila de Sincronização ---
   Future<void> addToSyncQueue(SyncOperationModel operation);
   Future<List<SyncOperationModel>> getPendingSyncOperations(String userId);
   Future<void> removeSyncOperation(int id);
@@ -186,7 +174,7 @@ class LocalDataSourceImpl implements LocalDataSource {
     final db = await databaseHelper.database;
     await db.insert(
       DatabaseHelper.tableShoppingLists,
-      shoppingList.toMap(),
+      shoppingList.toDbMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -195,9 +183,10 @@ class LocalDataSourceImpl implements LocalDataSource {
   Future<List<ShoppingListModel>> getAllShoppingListsForUser(
       String userId) async {
     final db = await databaseHelper.database;
+    // Alterado para ownerId
     final List<Map<String, dynamic>> maps = await db.query(
       DatabaseHelper.tableShoppingLists,
-      where: 'userId = ?',
+      where: 'ownerId = ?',
       whereArgs: [userId],
     );
     return List.generate(maps.length, (i) {
@@ -224,7 +213,7 @@ class LocalDataSourceImpl implements LocalDataSource {
     final db = await databaseHelper.database;
     return await db.update(
       DatabaseHelper.tableShoppingLists,
-      shoppingList.toMap(),
+      shoppingList.toDbMap(),
       where: 'id = ?',
       whereArgs: [shoppingList.id],
     );
@@ -245,7 +234,7 @@ class LocalDataSourceImpl implements LocalDataSource {
     final db = await databaseHelper.database;
     final userLists = await db.query(
       DatabaseHelper.tableShoppingLists,
-      where: 'userId = ?',
+      where: 'ownerId = ?',
       whereArgs: [userId],
       columns: ['id'],
     );
@@ -365,6 +354,8 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<List<ItemModel>> getAllItemsForUser(String userId) async {
     final db = await databaseHelper.database;
+    // A lógica de "listas compartilhadas" torna esta query complexa no SQLite.
+    // Por enquanto, vamos manter a busca por ownerId para o modo offline.
     final String sql = '''
       SELECT 
         i.*,
@@ -374,7 +365,7 @@ class LocalDataSourceImpl implements LocalDataSource {
       FROM ${DatabaseHelper.tableItems} i
       INNER JOIN ${DatabaseHelper.tableShoppingLists} sl ON i.shoppingListId = sl.id
       INNER JOIN ${DatabaseHelper.tableCategories} c ON i.categoryId = c.id
-      WHERE sl.userId = ?
+      WHERE sl.ownerId = ?
     ''';
 
     final List<Map<String, dynamic>> maps = await db.rawQuery(sql, [userId]);
@@ -386,6 +377,9 @@ class LocalDataSourceImpl implements LocalDataSource {
   Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(
       String userId) async {
     final db = await databaseHelper.database;
+    // Esta query agora precisa buscar todas as listas onde o userId é um membro.
+    // Isso é complexo com a forma como o SQLite lida com JSON.
+    // Simplificação: no modo offline, o usuário só vê as listas que ele criou.
     final String sql = '''
         SELECT 
             sl.*, 
@@ -394,7 +388,7 @@ class LocalDataSourceImpl implements LocalDataSource {
             SUM(i.price * i.quantity) as totalCost
         FROM ${DatabaseHelper.tableShoppingLists} sl
         LEFT JOIN ${DatabaseHelper.tableItems} i ON sl.id = i.shoppingListId
-        WHERE sl.userId = ?
+        WHERE sl.ownerId = ?
         GROUP BY sl.id
     ''';
     return await db.rawQuery(sql, [userId]);
@@ -419,7 +413,7 @@ class LocalDataSourceImpl implements LocalDataSource {
 
       final userLists = await txn.query(
         DatabaseHelper.tableShoppingLists,
-        where: 'userId = ?',
+        where: 'ownerId = ?',
         whereArgs: [userId],
         columns: ['id'],
       );
@@ -433,7 +427,7 @@ class LocalDataSourceImpl implements LocalDataSource {
       }
       batch.delete(
         DatabaseHelper.tableShoppingLists,
-        where: 'userId = ?',
+        where: 'ownerId = ?',
         whereArgs: [userId],
       );
 
@@ -450,7 +444,9 @@ class LocalDataSourceImpl implements LocalDataSource {
       }
       for (final listData in shoppingLists) {
         final map = listData as Map<String, dynamic>;
-        map['userId'] = userId;
+        map['ownerId'] = userId;
+        // Simula o proprietário como único membro na importação
+        map['members'] = jsonEncode([userId]);
         batch.insert(DatabaseHelper.tableShoppingLists, map);
       }
       for (final itemData in items) {
@@ -486,7 +482,7 @@ class LocalDataSourceImpl implements LocalDataSource {
       final batch = txn.batch();
       batch.delete(
         DatabaseHelper.tableShoppingLists,
-        where: 'userId = ?',
+        where: 'ownerId = ?',
         whereArgs: [userId],
       );
       batch.delete(

@@ -32,8 +32,6 @@ import 'package:superlistas/presentation/viewmodels/stats_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/theme_viewmodel.dart';
 import 'package:superlistas/presentation/viewmodels/units_viewmodel.dart';
 
-// A IMPORTAÇÃO PROBLEMÁTICA FOI REMOVIDA DESTA LINHA
-
 // --- PROVIDERS GLOBAIS DA UI ---
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -41,7 +39,6 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((r
   return ThemeModeNotifier();
 });
 
-// Este provider é usado para acessar o Scaffold a partir do AppBar/Drawer
 final mainScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
 });
@@ -51,9 +48,10 @@ final firebaseAuthServiceProvider = Provider<FirebaseAuthService>((ref) {
   return FirebaseAuthService();
 });
 
-// ... (O resto do arquivo permanece exatamente o mesmo)
 final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
-  return RemoteConfigService(FirebaseRemoteConfig.instance);
+  final config = RemoteConfigService(FirebaseRemoteConfig.instance);
+  // Não espere pela inicialização aqui, ela será chamada no main.dart
+  return config;
 });
 
 final firestoreDataSourceProvider = Provider<RemoteDataSource>((ref) {
@@ -86,9 +84,11 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   );
 });
 
+// <<< CORREÇÃO APLICADA AQUI >>>
 final authViewModelProvider = StateNotifierProvider<AuthViewModel, User?>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return AuthViewModel(authRepository);
+  final firestoreDataSource = ref.watch(firestoreDataSourceProvider); // Adiciona a dependência que faltava
+  return AuthViewModel(authRepository, firestoreDataSource); // Passa os dois argumentos
 });
 
 final singleListProvider = FutureProvider.autoDispose.family<ShoppingList, String>((ref, id) {
@@ -96,9 +96,9 @@ final singleListProvider = FutureProvider.autoDispose.family<ShoppingList, Strin
   return repository.getShoppingListById(id);
 });
 
-final shoppingListsProvider = FutureProvider.autoDispose.family<List<ShoppingList>, String>((ref, userId) {
+final shoppingListsStreamProvider = StreamProvider.autoDispose.family<List<ShoppingList>, String>((ref, userId) {
   final repository = ref.watch(shoppingListRepositoryProvider);
-  return repository.getShoppingLists(userId);
+  return repository.getShoppingListsStream(userId);
 });
 
 final shoppingListsViewModelProvider = StateNotifierProvider.autoDispose.family<ShoppingListsViewModel, AsyncValue<List<ShoppingList>>, String>((ref, userId) {

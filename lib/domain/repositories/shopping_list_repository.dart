@@ -5,20 +5,18 @@ import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/stats_data.dart';
 
 abstract class ShoppingListRepository {
-  // Streams para dados reativos
   Stream<List<ShoppingList>> getShoppingListsStream(String userId);
   Stream<List<Item>> getItemsStream(String userId, String listId);
-
-  // Futures para buscas pontuais
   Future<ShoppingList> getShoppingListById(String id);
   Future<List<ShoppingList>> getShoppingLists(String userId);
   Future<List<Item>> getItems(String listId);
-
-  // Operações de escrita
   Future<void> createShoppingList(ShoppingList list);
   Future<void> updateShoppingList(ShoppingList list);
   Future<void> deleteShoppingList(String id);
   Future<void> reuseShoppingList(ShoppingList listToReuse);
+  Future<void> shareList({required String listId, required String newMemberEmail});
+  Future<void> removeMember({required String listId, required String memberIdToRemove});
+  Future<void> leaveList({required String listId});
 
   Future<void> createItem(Item item, String listId);
   Future<void> updateItem(Item item, String listId);
@@ -37,7 +35,6 @@ abstract class ShoppingListRepository {
   Future<void> processSyncQueue(String userId);
   Future<void> deleteAllUserData(String userId);
 
-  // --- Métodos para Unidades ---
   Future<List<String>> getAllUnits();
   Future<void> addUnit(String name);
   Future<void> deleteUnit(String name);

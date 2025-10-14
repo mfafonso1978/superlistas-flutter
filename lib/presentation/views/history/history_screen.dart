@@ -224,7 +224,6 @@ class _HistoryListItem extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          // MODIFICAÇÃO: Ao clicar, abre a tela de itens em modo leitura
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -279,7 +278,9 @@ class _HistoryListItem extends ConsumerWidget {
                               .notifier)
                               .reuseList(list);
                           if (!context.mounted) return;
-                          ref.invalidate(shoppingListsProvider(userId));
+
+                          // <<< CORREÇÃO APLICADA AQUI >>>
+                          ref.invalidate(shoppingListsStreamProvider(userId));
 
                           int listsTabIndex = 1;
                           if (ref

@@ -1,4 +1,5 @@
 // lib/core/database/database_helper.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -6,14 +7,15 @@ import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   static const _databaseName = "Superlistas.db";
-  static const _databaseVersion = 8; // VERSÃO INCREMENTADA
+  // <<< VERSÃO INCREMENTADA PARA ACIONAR A MIGRAÇÃO >>>
+  static const _databaseVersion = 9;
 
   static const String tableUsers = 'users';
   static const String tableCategories = 'categories';
   static const String tableShoppingLists = 'shopping_lists';
   static const String tableItems = 'items';
   static const String tableUnits = 'units';
-  static const String tableSyncQueue = 'sync_queue'; // NOVA TABELA
+  static const String tableSyncQueue = 'sync_queue';
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
@@ -43,7 +45,8 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        photoUrl TEXT
       )
     ''');
 
@@ -56,6 +59,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // <<< ESTRUTURA ATUALIZADA PARA NOVAS INSTALAÇÕES >>>
     batch.execute('''
       CREATE TABLE $tableShoppingLists (
         id TEXT PRIMARY KEY,
@@ -63,8 +67,9 @@ class DatabaseHelper {
         creationDate TEXT NOT NULL,
         isArchived INTEGER NOT NULL DEFAULT 0,
         budget REAL,
-        userId TEXT NOT NULL, 
-        FOREIGN KEY (userId) REFERENCES $tableUsers (id) ON DELETE CASCADE
+        ownerId TEXT NOT NULL,
+        members TEXT NOT NULL,
+        FOREIGN KEY (ownerId) REFERENCES $tableUsers (id) ON DELETE CASCADE
       )
     ''');
 
@@ -154,6 +159,33 @@ class DatabaseHelper {
           timestamp TEXT NOT NULL
         )
       ''');
+    }
+    // <<< NOVO SCRIPT DE MIGRAÇÃO PARA A VERSÃO 9 >>>
+    if (oldVersion < 9) {
+      await db.transaction((txn) async {
+        // 1. Renomeia a coluna antiga para a nova
+        await txn.execute('ALTER TABLE $tableShoppingLists RENAME COLUMN userId TO ownerId');
+        // 2. Adiciona a nova coluna de membros
+        await txn.execute('ALTER TABLE $tableShoppingLists ADD COLUMN members TEXT');
+        // 3. Adiciona a coluna de foto de perfil na tabela de usuários
+        await txn.execute('ALTER TABLE $tableUsers ADD COLUMN photoUrl TEXT');
+      });
+
+      // 4. Preenche a nova coluna 'members' com o 'ownerId' de cada lista
+      final lists = await db.query(tableShoppingLists, columns: ['id', 'ownerId']);
+      final batch = db.batch();
+      for (final list in lists) {
+        final ownerId = list['ownerId'];
+        if (ownerId != null) {
+          batch.update(
+            tableShoppingLists,
+            {'members': jsonEncode([ownerId])}, // Cria uma lista JSON com o ownerId
+            where: 'id = ?',
+            whereArgs: [list['id']],
+          );
+        }
+      }
+      await batch.commit(noResult: true);
     }
   }
 

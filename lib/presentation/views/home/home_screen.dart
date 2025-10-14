@@ -13,7 +13,6 @@ import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/list_items/list_items_screen.dart';
 import 'package:superlistas/presentation/views/main/main_screen.dart';
 
-
 double _contentBottomInset(BuildContext context) =>
     MediaQuery.of(context).viewPadding.bottom + 80;
 
@@ -43,7 +42,8 @@ class HomeBackground extends ConsumerWidget {
         ),
         Positioned.fill(
           child: ColoredBox(
-            color: Colors.black.withAlpha((255 * (isDark ? 0.35 : 0.15)).toInt()),
+            color: Colors.black
+                .withAlpha((255 * (isDark ? 0.35 : 0.15)).toInt()),
           ),
         ),
       ],
@@ -64,8 +64,10 @@ class HomeScreen extends ConsumerWidget {
 
     final userId = user.id;
 
-    final dashboardDataAsync = ref.watch(dashboardViewModelProvider(userId));
-    final pullToRefreshEnabled = ref.watch(remoteConfigServiceProvider).isDashboardPullToRefreshEnabled;
+    final dashboardDataAsync =
+    ref.watch(dashboardViewModelProvider(userId));
+    final pullToRefreshEnabled =
+        ref.watch(remoteConfigServiceProvider).isDashboardPullToRefreshEnabled;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -74,7 +76,9 @@ class HomeScreen extends ConsumerWidget {
           const Positioned.fill(child: HomeBackground()),
           RefreshIndicator(
             onRefresh: pullToRefreshEnabled
-                ? () => ref.read(dashboardViewModelProvider(userId).notifier).loadData()
+                ? () => ref
+                .read(dashboardViewModelProvider(userId).notifier)
+                .loadData()
                 : () async {},
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(
@@ -93,7 +97,9 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 SliverPadding(
-                  padding: EdgeInsets.only(bottom: _contentBottomInset(context)),
+                  padding: EdgeInsets.only(
+                    bottom: _contentBottomInset(context),
+                  ),
                 ),
               ],
             ),
@@ -104,13 +110,6 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-
-// #############################################################################
-// EFEITO PARALLAX COM DRAWER FUNCIONAL
-// - AppBar encolhe suavemente ao rolar
-// - Drawer abre corretamente usando mainScaffoldKeyProvider
-// - Cores sólidas: branco (claro) e #344049 (escuro)
-// #############################################################################
 class _DashboardSliverAppBar extends ConsumerWidget {
   final User user;
   const _DashboardSliverAppBar({required this.user});
@@ -123,7 +122,6 @@ class _DashboardSliverAppBar extends ConsumerWidget {
     DateFormat('EEEE, d \'de\' MMMM', 'pt_BR').format(DateTime.now());
     final isDark = theme.brightness == Brightness.dark;
 
-    // Altura expandida e colapsada
     const double expandedHeight = kToolbarHeight + 64;
     const double collapsedHeight = kToolbarHeight;
 
@@ -137,7 +135,6 @@ class _DashboardSliverAppBar extends ConsumerWidget {
       leading: IconButton(
         icon: Icon(Icons.menu, color: scheme.onSurface),
         onPressed: () {
-          // Usa o GlobalKey do MainScreen para abrir o drawer correto
           final scaffoldKey = ref.read(mainScaffoldKeyProvider);
           scaffoldKey.currentState?.openDrawer();
         },
@@ -145,25 +142,19 @@ class _DashboardSliverAppBar extends ConsumerWidget {
       ),
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-          // Calcular o progresso do encolhimento
           final double statusBarHeight = MediaQuery.of(context).padding.top;
           final double maxHeight = expandedHeight + statusBarHeight;
           final double minHeight = collapsedHeight + statusBarHeight;
           final double currentHeight = constraints.maxHeight;
 
-          // shrinkProgress: 0.0 = totalmente expandido, 1.0 = totalmente colapsado
           final double shrinkProgress =
           ((maxHeight - currentHeight) / (maxHeight - minHeight))
               .clamp(0.0, 1.0);
 
-          // Opacidade da data (desaparece suavemente ao encolher)
-          final double dateOpacity = (1.0 - shrinkProgress).clamp(0.0, 1.0);
-
-          // Ajuste de espaçamento vertical baseado no encolhimento
+          final double dateOpacity =
+          (1.0 - shrinkProgress).clamp(0.0, 1.0);
           final double topPadding = 8.0 - (shrinkProgress * 6.0);
           final double bottomPadding = 10.0 - (shrinkProgress * 8.0);
-
-          // Espaçamento entre saudação e data (reduz ao encolher)
           final double textSpacing = 4.0 * (1.0 - shrinkProgress);
 
           return ClipRect(
@@ -176,7 +167,8 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                       : Colors.white,
                   border: Border(
                     bottom: BorderSide(
-                      color: scheme.onSurface.withAlpha((255 * 0.08).toInt()),
+                      color: scheme.onSurface
+                          .withAlpha((255 * 0.08).toInt()),
                       width: 1,
                     ),
                   ),
@@ -184,7 +176,8 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(60, topPadding, 16, bottomPadding),
+                    padding: EdgeInsets.fromLTRB(
+                        60, topPadding, 16, bottomPadding),
                     child: Row(
                       children: [
                         Expanded(
@@ -194,15 +187,16 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                               maxHeight: double.infinity,
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
                                 children: [
-                                  // Saudação - sempre visível com tamanho fixo
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     alignment: Alignment.centerLeft,
                                     child: Text(
                                       'Olá, ${user.name} 👋',
-                                      style: theme.textTheme.headlineSmall?.copyWith(
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
                                         fontWeight: FontWeight.w800,
                                         color: scheme.onSurface,
                                         letterSpacing: -0.5,
@@ -211,18 +205,19 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                                       overflow: TextOverflow.clip,
                                     ),
                                   ),
-                                  // Espaçamento dinâmico
                                   if (textSpacing > 0.1)
                                     SizedBox(height: textSpacing),
-                                  // Data - desaparece gradualmente ao encolher
                                   if (dateOpacity > 0.01)
                                     Opacity(
                                       opacity: dateOpacity,
                                       child: Text(
-                                        today[0].toUpperCase() + today.substring(1),
-                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                        today[0].toUpperCase() +
+                                            today.substring(1),
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
                                           color: scheme.onSurface
-                                              .withAlpha((255 * 0.8).toInt()),
+                                              .withAlpha(
+                                              (255 * 0.8).toInt()),
                                           fontWeight: FontWeight.w500,
                                         ),
                                         maxLines: 1,
@@ -235,10 +230,10 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Avatar - sempre visível
                         CircleAvatar(
                           radius: 26,
-                          backgroundColor: scheme.secondary.withAlpha(50),
+                          backgroundColor:
+                          scheme.secondary.withAlpha(50),
                           child: user.photoUrl == null
                               ? Text(
                             user.name.isNotEmpty
@@ -256,21 +251,30 @@ class _DashboardSliverAppBar extends ConsumerWidget {
                               fit: BoxFit.cover,
                               width: 52,
                               height: 52,
-                              errorBuilder: (context, error, stackTrace) {
+                              errorBuilder:
+                                  (context, error, stackTrace) {
                                 return Icon(
                                   Icons.person,
                                   color: scheme.secondary,
                                   size: 30,
                                 );
                               },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
+                              loadingBuilder: (context, child,
+                                  loadingProgress) {
+                                if (loadingProgress == null) {
+                                  return child;
+                                }
                                 return Center(
-                                  child: CircularProgressIndicator(
+                                  child:
+                                  CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    value: loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
+                                    value: loadingProgress
+                                        .expectedTotalBytes !=
+                                        null
+                                        ? loadingProgress
+                                        .cumulativeBytesLoaded /
+                                        loadingProgress
+                                            .expectedTotalBytes!
                                         : null,
                                   ),
                                 );
@@ -291,7 +295,6 @@ class _DashboardSliverAppBar extends ConsumerWidget {
   }
 }
 
-
 List<Widget> _buildDataSlivers({
   required BuildContext context,
   required WidgetRef ref,
@@ -300,13 +303,18 @@ List<Widget> _buildDataSlivers({
 }) {
   final remoteConfig = ref.watch(remoteConfigServiceProvider);
   final metricsEnabled = remoteConfig.isDashboardMetricsEnabled;
-  final quickActionsEnabled = remoteConfig.isDashboardQuickActionsEnabled;
-  final recentListsEnabled = remoteConfig.isDashboardRecentListsEnabled;
+  final quickActionsEnabled =
+      remoteConfig.isDashboardQuickActionsEnabled;
+  final recentListsEnabled =
+      remoteConfig.isDashboardRecentListsEnabled;
 
   final recent = data.recentLists;
-  final ShoppingList? lastActive =
-  recent.where((l) => !l.isCompleted && !l.isArchived).isNotEmpty
-      ? recent.firstWhere((l) => !l.isCompleted && !l.isArchived)
+  final ShoppingList? lastActive = recent
+      .where((l) => !l.isCompleted && !l.isArchived)
+      .isNotEmpty
+      ? recent.firstWhere(
+        (l) => !l.isCompleted && !l.isArchived,
+  )
       : (recent.isNotEmpty ? recent.first : null);
 
   return [
@@ -355,7 +363,8 @@ List<Widget> _buildDataSlivers({
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
-          child: _SectionTitle('Ações Rápidas', icon: Icons.flash_on_rounded),
+          child: _SectionTitle('Ações Rápidas',
+              icon: Icons.flash_on_rounded),
         ),
       ),
       SliverToBoxAdapter(
@@ -370,15 +379,19 @@ List<Widget> _buildDataSlivers({
         ),
       ),
       if (data.recentLists.isEmpty)
+      // >>>>> NOVO PLACEHOLDER PARA "NENHUMA LISTA CRIADA" (HOME)
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _EmptyRecent(userId: userId),
+          child: _EmptyShoppingListHome(
+            assetPath: 'assets/images/cesta.jpg',
+            userId: userId,
           ),
         )
       else
         SliverToBoxAdapter(
-          child: _RecentHorizontalList(userId: userId, lists: data.recentLists),
+          child: _RecentHorizontalList(
+            userId: userId,
+            lists: data.recentLists,
+          ),
         ),
     ],
   ];
@@ -394,13 +407,15 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
         childAspectRatio: 1.65,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        children: List.generate(4, (_) => const _ShimmerBox(h: 100, r: 20)),
+        children:
+        List.generate(4, (_) => const _ShimmerBox(h: 100, r: 20)),
       ),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
     SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: const SliverToBoxAdapter(child: _ShimmerBox(h: 24, r: 8, w: 160)),
+      sliver: const SliverToBoxAdapter(
+          child: _ShimmerBox(h: 24, r: 8, w: 160)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
     SliverToBoxAdapter(
@@ -411,14 +426,16 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: 6,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => const _ShimmerBox(h: 120, r: 20, w: 100),
+          itemBuilder: (_, __) =>
+          const _ShimmerBox(h: 120, r: 20, w: 100),
         ),
       ),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
     SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: const SliverToBoxAdapter(child: _ShimmerBox(h: 24, r: 8, w: 180)),
+      sliver: const SliverToBoxAdapter(
+          child: _ShimmerBox(h: 24, r: 8, w: 180)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
     SliverToBoxAdapter(
@@ -429,7 +446,8 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: 3,
           separatorBuilder: (_, __) => const SizedBox(width: 16),
-          itemBuilder: (_, __) => const _ShimmerBox(h: 200, r: 24, w: 320),
+          itemBuilder: (_, __) =>
+          const _ShimmerBox(h: 200, r: 24, w: 320),
         ),
       ),
     ),
@@ -460,9 +478,12 @@ class _ShimmerBox extends StatelessWidget {
         gradient: LinearGradient(
           colors: isDark
               ? [
-            scheme.surfaceContainerHighest.withAlpha((255 * 0.5).toInt()),
-            scheme.surfaceContainerHighest.withAlpha((255 * 0.3).toInt()),
-            scheme.surfaceContainerHighest.withAlpha((255 * 0.5).toInt()),
+            scheme.surfaceContainerHighest
+                .withAlpha((255 * 0.5).toInt()),
+            scheme.surfaceContainerHighest
+                .withAlpha((255 * 0.3).toInt()),
+            scheme.surfaceContainerHighest
+                .withAlpha((255 * 0.5).toInt()),
           ]
               : [
             Colors.grey.shade200,
@@ -537,13 +558,15 @@ class _MetricCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: () {},
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -552,13 +575,15 @@ class _MetricCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: data.gradient[0].withAlpha((255 * 0.3).toInt()),
+                            color: data.gradient[0]
+                                .withAlpha((255 * 0.3).toInt()),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: Icon(data.icon, color: Colors.white, size: 18),
+                      child: Icon(data.icon,
+                          color: Colors.white, size: 18),
                     ),
                     Flexible(
                       child: FittedBox(
@@ -583,7 +608,8 @@ class _MetricCard extends StatelessWidget {
                   data.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style:
+                  Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
@@ -644,19 +670,21 @@ class _QuickActionsBar extends ConsumerWidget {
   final String userId;
   final ShoppingList? lastActive;
 
-  const _QuickActionsBar({required this.userId, required this.lastActive});
+  const _QuickActionsBar(
+      {required this.userId, required this.lastActive});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vm = ref.read(shoppingListsViewModelProvider(userId).notifier);
+    final vm =
+    ref.read(shoppingListsViewModelProvider(userId).notifier);
 
-    // Lendo as flags de ações
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
     final addListEnabled = remoteConfig.isAddListEnabled;
     final duplicateListEnabled = remoteConfig.isDuplicateListEnabled;
     final templatesEnabled = remoteConfig.isTemplatesEnabled;
     final archiveEnabled = remoteConfig.isArchiveListEnabled;
-    final viewAllEnabled = ref.watch(remoteConfigServiceProvider).isShoppingListsScreenEnabled;
+    final viewAllEnabled =
+        ref.watch(remoteConfigServiceProvider).isShoppingListsScreenEnabled;
 
     void openListById(String listId, {ShoppingList? known}) {
       Navigator.push(
@@ -666,7 +694,8 @@ class _QuickActionsBar extends ConsumerWidget {
             shoppingListId: listId,
           ),
         ),
-      ).then((_) => ref.invalidate(dashboardViewModelProvider(userId)));
+      ).then((_) =>
+          ref.invalidate(dashboardViewModelProvider(userId)));
     }
 
     void duplicateLast() {
@@ -693,7 +722,8 @@ class _QuickActionsBar extends ConsumerWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Arquivar concluídas'),
-          content: const Text('Arquivar todas as listas concluídas?'),
+          content:
+          const Text('Arquivar todas as listas concluídas?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -702,8 +732,8 @@ class _QuickActionsBar extends ConsumerWidget {
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              child:
-              const Text('Arquivar', style: TextStyle(color: Colors.white)),
+              child: const Text('Arquivar',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -737,7 +767,11 @@ class _QuickActionsBar extends ConsumerWidget {
     }
 
     void openAll() {
-      final listsTabIndex = ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled ? 1 : 0;
+      final listsTabIndex = ref
+          .read(remoteConfigServiceProvider)
+          .isDashboardScreenEnabled
+          ? 1
+          : 0;
       ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
     }
 
@@ -748,7 +782,8 @@ class _QuickActionsBar extends ConsumerWidget {
           label: 'Nova lista',
           onTap: () {
             HapticFeedback.lightImpact();
-            showAddOrEditListDialog(context: context, ref: ref, userId: userId);
+            showAddOrEditListDialog(
+                context: context, ref: ref, userId: userId);
           },
           isPrimary: true,
         ),
@@ -766,8 +801,8 @@ class _QuickActionsBar extends ConsumerWidget {
                 shoppingListId: lastActive!.id,
               ),
             ),
-          ).then(
-                  (_) => ref.invalidate(dashboardViewModelProvider(userId)));
+          ).then((_) =>
+              ref.invalidate(dashboardViewModelProvider(userId)));
         },
       ),
       if (duplicateListEnabled)
@@ -803,7 +838,8 @@ class _QuickActionsBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: actions.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => _QuickActionCard(action: actions[i]),
+        itemBuilder: (_, i) =>
+            _QuickActionCard(action: actions[i]),
       ),
     );
   }
@@ -847,7 +883,8 @@ class _QuickActionCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: [
               scheme.secondary,
-              scheme.secondary.withAlpha((255 * 0.8).toInt()),
+              scheme.secondary
+                  .withAlpha((255 * 0.8).toInt()),
             ],
           )
               : LinearGradient(
@@ -855,12 +892,16 @@ class _QuickActionCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: isDark
                 ? [
-              scheme.surface.withAlpha((255 * 0.8).toInt()),
-              scheme.surface.withAlpha((255 * 0.6).toInt()),
+              scheme.surface
+                  .withAlpha((255 * 0.8).toInt()),
+              scheme.surface
+                  .withAlpha((255 * 0.6).toInt()),
             ]
                 : [
-              Colors.white.withAlpha((255 * 0.75).toInt()),
-              Colors.white.withAlpha((255 * 0.55).toInt()),
+              Colors.white
+                  .withAlpha((255 * 0.75).toInt()),
+              Colors.white
+                  .withAlpha((255 * 0.55).toInt()),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
@@ -868,15 +909,19 @@ class _QuickActionCard extends StatelessWidget {
             color: action.isPrimary
                 ? Colors.transparent
                 : isDark
-                ? scheme.outline.withAlpha((255 * 0.2).toInt())
-                : scheme.outline.withAlpha((255 * 0.1).toInt()),
+                ? scheme.outline
+                .withAlpha((255 * 0.2).toInt())
+                : scheme.outline
+                .withAlpha((255 * 0.1).toInt()),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
               color: action.isPrimary
-                  ? scheme.secondary.withAlpha((255 * 0.3).toInt())
-                  : Colors.black.withAlpha((255 * 0.05).toInt()),
+                  ? scheme.secondary
+                  .withAlpha((255 * 0.3).toInt())
+                  : Colors.black
+                  .withAlpha((255 * 0.05).toInt()),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -896,14 +941,16 @@ class _QuickActionCard extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: action.isPrimary
-                          ? Colors.white.withAlpha((255 * 0.2).toInt())
+                          ? Colors.white
+                          .withAlpha((255 * 0.2).toInt())
                           : scheme.secondary,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
                       action.icon,
-                      color:
-                      action.isPrimary ? Colors.white : scheme.onSecondary,
+                      color: action.isPrimary
+                          ? Colors.white
+                          : scheme.onSecondary,
                       size: 24,
                     ),
                   ),
@@ -913,7 +960,8 @@ class _QuickActionCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    style:
+                    Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: action.isPrimary
                           ? Colors.white
                           : scheme.onSurface,
@@ -940,18 +988,27 @@ class _RecentHeader extends ConsumerWidget {
 
     return Row(
       children: [
-        const _SectionTitle('Listas Recentes', icon: Icons.history_rounded),
+        const _SectionTitle('Listas Recentes',
+            icon: Icons.history_rounded),
         const Spacer(),
-        if (ref.watch(remoteConfigServiceProvider).isShoppingListsScreenEnabled)
+        if (ref
+            .watch(remoteConfigServiceProvider)
+            .isShoppingListsScreenEnabled)
           TextButton.icon(
             onPressed: () {
-              final listsTabIndex = ref.read(remoteConfigServiceProvider).isDashboardScreenEnabled ? 1 : 0;
-              ref.read(mainScreenIndexProvider.notifier).state = listsTabIndex;
+              final listsTabIndex = ref
+                  .read(remoteConfigServiceProvider)
+                  .isDashboardScreenEnabled
+                  ? 1
+                  : 0;
+              ref.read(mainScreenIndexProvider.notifier).state =
+                  listsTabIndex;
             },
             style: TextButton.styleFrom(
               foregroundColor: scheme.secondary,
             ),
-            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            icon:
+            const Icon(Icons.arrow_forward_rounded, size: 18),
             label: const Text(
               'Ver todas',
               style: TextStyle(
@@ -1004,7 +1061,8 @@ class _EmptyRecent extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: scheme.secondary.withAlpha((255 * 0.1).toInt()),
+                color: scheme.secondary
+                    .withAlpha((255 * 0.1).toInt()),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
@@ -1016,7 +1074,8 @@ class _EmptyRecent extends ConsumerWidget {
             const SizedBox(height: 20),
             Text(
               'Nenhuma lista criada ainda',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style:
+              Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: scheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
@@ -1029,16 +1088,19 @@ class _EmptyRecent extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            if(ref.watch(remoteConfigServiceProvider).isAddListEnabled)
+            if (ref
+                .watch(remoteConfigServiceProvider)
+                .isAddListEnabled)
               FilledButton.icon(
                 onPressed: () {
-                  showAddOrEditListDialog(context: context, ref: ref, userId: userId);
+                  showAddOrEditListDialog(
+                      context: context, ref: ref, userId: userId);
                 },
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Criar primeira lista'),
                 style: FilledButton.styleFrom(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 12),
                   backgroundColor: scheme.secondary,
                 ),
               ),
@@ -1053,7 +1115,8 @@ class _RecentHorizontalList extends StatelessWidget {
   final String userId;
   final List<ShoppingList> lists;
 
-  const _RecentHorizontalList({required this.userId, required this.lists});
+  const _RecentHorizontalList(
+      {required this.userId, required this.lists});
 
   @override
   Widget build(BuildContext context) {
@@ -1081,8 +1144,9 @@ class _RecentListCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isCompleted = list.isArchived;
     final statusText = isCompleted ? 'Concluída' : 'Pendente';
-    final statusColor =
-    isCompleted ? Colors.green : Theme.of(context).colorScheme.secondary;
+    final statusColor = isCompleted
+        ? Colors.green
+        : Theme.of(context).colorScheme.secondary;
 
     final budgetStr = list.budget == null
         ? null
@@ -1118,7 +1182,8 @@ class _RecentListCard extends ConsumerWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha((255 * 0.05).toInt()),
+              color:
+              Colors.black.withAlpha((255 * 0.05).toInt()),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -1136,7 +1201,8 @@ class _RecentListCard extends ConsumerWidget {
                     shoppingListId: list.id,
                   ),
                 ),
-              ).then((_) => ref.invalidate(dashboardViewModelProvider(userId)));
+              ).then((_) =>
+                  ref.invalidate(dashboardViewModelProvider(userId)));
             },
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -1160,7 +1226,8 @@ class _RecentListCard extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
                           children: [
                             Text(
                               list.name,
@@ -1182,21 +1249,25 @@ class _RecentListCard extends ConsumerWidget {
                                   .textTheme
                                   .bodySmall
                                   ?.copyWith(
-                                color: scheme.onSurfaceVariant,
+                                color:
+                                scheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      _StatusBadge(text: statusText, color: statusColor),
+                      _StatusBadge(
+                          text: statusText, color: statusColor),
                     ],
                   ),
                   const Spacer(),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'Progresso',
@@ -1204,7 +1275,8 @@ class _RecentListCard extends ConsumerWidget {
                                 .textTheme
                                 .labelMedium
                                 ?.copyWith(
-                              color: scheme.onSurfaceVariant,
+                              color:
+                              scheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1226,14 +1298,18 @@ class _RecentListCard extends ConsumerWidget {
                         child: LinearProgressIndicator(
                           value: list.progress,
                           minHeight: 8,
-                          backgroundColor:
-                          scheme.surfaceContainerHigh.withAlpha((255 * 0.3).toInt()),
-                          valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                          backgroundColor: scheme
+                              .surfaceContainerHigh
+                              .withAlpha((255 * 0.3).toInt()),
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(
+                              statusColor),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             '${list.checkedItems} de ${list.totalItems} itens',
@@ -1241,18 +1317,24 @@ class _RecentListCard extends ConsumerWidget {
                                 .textTheme
                                 .bodySmall
                                 ?.copyWith(
-                              color: scheme.onSurfaceVariant,
+                              color:
+                              scheme.onSurfaceVariant,
                             ),
                           ),
                           if (budgetStr != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(
+                              padding:
+                              const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? scheme.secondary.withAlpha((255 * 0.2).toInt())
-                                    : scheme.primary.withAlpha((255 * 0.1).toInt()),
-                                borderRadius: BorderRadius.circular(8),
+                                    ? scheme.secondary
+                                    .withAlpha(
+                                    (255 * 0.2).toInt())
+                                    : scheme.primary.withAlpha(
+                                    (255 * 0.1).toInt()),
+                                borderRadius:
+                                BorderRadius.circular(8),
                               ),
                               child: Text(
                                 budgetStr,
@@ -1263,7 +1345,8 @@ class _RecentListCard extends ConsumerWidget {
                                   color: isDark
                                       ? scheme.secondary
                                       : scheme.primary,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight:
+                                  FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -1290,7 +1373,8 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(12),
@@ -1323,18 +1407,25 @@ class _DashboardError extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: scheme.errorContainer.withAlpha((255 * 0.1).toInt()),
+            color: scheme.errorContainer
+                .withAlpha((255 * 0.1).toInt()),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: scheme.error.withAlpha((255 * 0.3).toInt())),
+            border: Border.all(
+                color: scheme.error
+                    .withAlpha((255 * 0.3).toInt())),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded, color: scheme.error, size: 48),
+              Icon(Icons.error_outline_rounded,
+                  color: scheme.error, size: 48),
               const SizedBox(height: 16),
               Text(
                 'Ops! Algo deu errado',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(
                   color: scheme.error,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1343,7 +1434,8 @@ class _DashboardError extends StatelessWidget {
               Text(
                 err,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant),
+                style: TextStyle(
+                    color: scheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -1412,12 +1504,14 @@ void _showTemplatePicker(
                 : '';
             return ListTile(
               leading: Icon(t.icon, color: scheme.secondary),
-              title: Text(t.name, style: TextStyle(color: scheme.onSurface)),
+              title: Text(t.name,
+                  style: TextStyle(color: scheme.onSurface)),
               subtitle: budgetText.isEmpty
                   ? null
                   : Text(
                 budgetText,
-                style: TextStyle(color: scheme.onSurfaceVariant),
+                style: TextStyle(
+                    color: scheme.onSurfaceVariant),
               ),
               onTap: () async {
                 Navigator.pop(ctx);
@@ -1443,4 +1537,184 @@ class _ListTemplate {
     required this.icon,
     this.suggestedBudget,
   });
+}
+
+/// ===============================================================
+/// WIDGET: LISTA DE COMPRAS AINDA NÃO CRIADA (HOME)
+/// Visual com glass, imagem arredondada e botão de criar lista.
+/// ===============================================================
+class _EmptyShoppingListHome extends ConsumerWidget {
+  final String assetPath;
+  final String userId;
+
+  const _EmptyShoppingListHome({
+    required this.assetPath,
+    required this.userId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final canCreateList =
+        ref.watch(remoteConfigServiceProvider).isAddListEnabled;
+    final colorScheme = theme.colorScheme;
+
+    final Color glassColor =
+    (isDark ? const Color(0xFF2C3A43) : Colors.white).withOpacity(0.85);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: glassColor,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color:
+                  (isDark ? Colors.white : Colors.black).withOpacity(0.06),
+                  width: 1,
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    glassColor,
+                    glassColor.withOpacity(isDark ? 0.75 : 0.9),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // IMAGEM
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Image.asset(
+                        assetPath,
+                        width: 240,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (context, error, stack) =>
+                        const Icon(Icons.image_not_supported_outlined, size: 80),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // TÍTULO
+                  Text(
+                    'Nenhuma lista de compras criada',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : colorScheme.primary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // SUBTÍTULO
+                  Text(
+                    'Crie sua primeira lista e comece a planejar suas compras com praticidade!',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // BOTÃO
+                  if (canCreateList)
+                    FilledButton.icon(
+                      onPressed: () {
+                        showAddOrEditListDialog(
+                          context: context,
+                          ref: ref,
+                          userId: userId,
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Criar nova lista'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 28, vertical: 14),
+                        backgroundColor: colorScheme.secondary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 6,
+                      ),
+                    ),
+
+                  const SizedBox(height: 18),
+
+                  // DICA
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: (isDark
+                          ? Colors.teal.shade900
+                          : Colors.teal.shade50)
+                          .withOpacity(isDark ? 0.6 : 1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: (isDark
+                            ? Colors.tealAccent
+                            : Colors.teal)
+                            .withOpacity(0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.lightbulb_outline, size: 18),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Dica: use modelos prontos ou duplique uma lista anterior!',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

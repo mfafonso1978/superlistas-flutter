@@ -18,11 +18,10 @@ class ListItemsViewModel extends StateNotifier<AsyncValue<List<Item>>> {
   Future<void> _invalidateDependentProviders() async {
     try {
       final list = await _repository.getShoppingListById(_shoppingListId);
-      final userId = list.userId;
+      final userId = list.ownerId;
 
       ref.invalidate(listItemsStreamProvider(_shoppingListId));
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(userId));
+      ref.invalidate(shoppingListsStreamProvider(userId));
       ref.invalidate(dashboardViewModelProvider(userId));
       ref.invalidate(singleListProvider(_shoppingListId));
     } catch (_) {
@@ -68,7 +67,7 @@ class ListItemsViewModel extends StateNotifier<AsyncValue<List<Item>>> {
   Future<void> deleteItem(String itemId) async {
     try {
       final list = await _repository.getShoppingListById(_shoppingListId);
-      final userId = list.userId;
+      final userId = list.ownerId;
 
       await _repository.deleteItem(itemId, _shoppingListId, userId);
       await _invalidateDependentProviders();
@@ -81,10 +80,10 @@ class ListItemsViewModel extends StateNotifier<AsyncValue<List<Item>>> {
     try {
       final listToArchive = list.copyWith(isArchived: true);
       await _repository.updateShoppingList(listToArchive);
-      // CORREÇÃO APLICADA AQUI
-      ref.invalidate(shoppingListsProvider(list.userId));
-      ref.invalidate(historyViewModelProvider(list.userId));
-      ref.invalidate(dashboardViewModelProvider(list.userId));
+
+      ref.invalidate(shoppingListsStreamProvider(list.ownerId));
+      ref.invalidate(historyViewModelProvider(list.ownerId));
+      ref.invalidate(dashboardViewModelProvider(list.ownerId));
     } catch (e, s) {
       state = AsyncValue.error(e, s);
     }

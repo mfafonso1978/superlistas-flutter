@@ -34,7 +34,6 @@ class SettingsScreen extends ConsumerWidget {
     final unitsScreenEnabled = remoteConfig.isUnitsScreenEnabled;
     final importExportEnabled = remoteConfig.isImportExportEnabled;
 
-    // Verifica se o usuário logado é do tipo e-mail/senha
     final isPasswordUser = ref.read(authViewModelProvider.notifier).isPasswordProvider();
 
     return Scaffold(
@@ -83,7 +82,6 @@ class SettingsScreen extends ConsumerWidget {
                 GlassCard(
                   child: Column(
                     children: [
-                      // Só mostra "Alterar Senha" se o usuário for do tipo e-mail/senha
                       if(isPasswordUser) ...[
                         ListTile(
                           leading: Icon(Icons.lock_reset_rounded, color: scheme.secondary),
@@ -322,8 +320,6 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   );
 
   try {
-    // Note: This relies on a 'deleteAllUserData' method in a different ViewModel.
-    // Assuming 'settingsViewModelProvider' has this method from previous context.
     await ref.read(settingsViewModelProvider.notifier).deleteAllUserData();
 
     if (!context.mounted) return;
@@ -332,7 +328,7 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
 
     final currentUser = ref.read(authViewModelProvider);
     if (currentUser != null) {
-      ref.invalidate(shoppingListsProvider(currentUser.id));
+      ref.invalidate(shoppingListsStreamProvider(currentUser.id));
       ref.invalidate(historyViewModelProvider(currentUser.id));
       ref.invalidate(dashboardViewModelProvider(currentUser.id));
       ref.invalidate(statsViewModelProvider(currentUser.id));
@@ -452,7 +448,7 @@ Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
     await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content);
 
     if (!context.mounted) return;
-    ref.invalidate(shoppingListsProvider(currentUser.id));
+    ref.invalidate(shoppingListsStreamProvider(currentUser.id));
     ref.invalidate(historyViewModelProvider(currentUser.id));
     ref.invalidate(dashboardViewModelProvider(currentUser.id));
     ref.invalidate(statsViewModelProvider(currentUser.id));
