@@ -92,11 +92,16 @@ class ListItemsScreen extends ConsumerWidget {
     final addItemEnabled = remoteConfig.isAddItemEnabled;
 
     return shoppingListAsync.when(
-      loading: () => Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(appBar: AppBar(), body: Center(child: Text('Erro ao carregar a lista: $err'))),
+      loading: () => Scaffold(
+          appBar: AppBar(),
+          body: const Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(
+          appBar: AppBar(),
+          body: Center(child: Text('Erro ao carregar a lista: $err'))),
       data: (shoppingList) {
         final itemsAsync = ref.watch(listItemsStreamProvider(shoppingList.id));
-        final viewModel = ref.read(listItemsViewModelProvider(shoppingList.id).notifier);
+        final viewModel =
+        ref.read(listItemsViewModelProvider(shoppingList.id).notifier);
 
         final bool isReadOnly = shoppingList.isArchived;
 
@@ -108,9 +113,11 @@ class ListItemsScreen extends ConsumerWidget {
               const AppBackground(),
               itemsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, stack) => Center(child: Text('Ocorreu um erro: $err')),
+                error: (err, stack) =>
+                    Center(child: Text('Ocorreu um erro: $err')),
                 data: (items) {
-                  final double totalCost = items.fold(0.0, (sum, item) => sum + item.subtotal);
+                  final double totalCost =
+                  items.fold(0.0, (sum, item) => sum + item.subtotal);
 
                   return CustomScrollView(
                     slivers: [
@@ -123,17 +130,25 @@ class ListItemsScreen extends ConsumerWidget {
                       if (items.isEmpty)
                         SliverFillRemaining(
                           hasScrollBody: false,
-                          child: _EmptyListPlaceholder(
-                            isReadOnly: isReadOnly,
-                            assetPath: 'assets/images/empty_list.png',
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text(
+                                isReadOnly
+                                    ? 'Esta lista não tinha itens.'
+                                    : 'Nenhum item na lista. Adicione um!',
+                                style: const TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
                           ),
                         )
                       else
-                        _buildGroupedList(items, viewModel, shoppingList, totalCost, isReadOnly),
+                        _buildGroupedList(
+                            items, viewModel, shoppingList, totalCost, isReadOnly),
                       SliverPadding(
                         padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).viewPadding.bottom + 80,
-                        ),
+                            bottom:
+                            MediaQuery.of(context).viewPadding.bottom + 80),
                       ),
                     ],
                   );
@@ -144,15 +159,21 @@ class ListItemsScreen extends ConsumerWidget {
           floatingActionButton: (addItemEnabled && !isReadOnly)
               ? itemsAsync.when(
             data: (items) {
-              final double totalCost = items.fold(0.0, (sum, item) => sum + item.subtotal);
-              final bool hasBudget = shoppingList.budget != null && shoppingList.budget! > 0;
-              final bool budgetExceeded = hasBudget && totalCost >= shoppingList.budget!;
+              final double totalCost =
+              items.fold(0.0, (sum, item) => sum + item.subtotal);
+              final bool hasBudget =
+                  shoppingList.budget != null && shoppingList.budget! > 0;
+              final bool budgetExceeded =
+                  hasBudget && totalCost >= shoppingList.budget!;
 
               return FloatingActionButton(
                 onPressed: budgetExceeded
                     ? null
-                    : () => _showItemFormModal(context, ref, shoppingList, currentTotalCost: totalCost),
-                backgroundColor: budgetExceeded ? Colors.grey : Theme.of(context).colorScheme.secondary,
+                    : () => _showItemFormModal(context, ref, shoppingList,
+                    currentTotalCost: totalCost),
+                backgroundColor: budgetExceeded
+                    ? Colors.grey
+                    : Theme.of(context).colorScheme.secondary,
                 shape: const CircleBorder(),
                 child: const Icon(Icons.add),
               );
@@ -183,9 +204,11 @@ class ListItemsScreen extends ConsumerWidget {
         final categoryName = categoryNames[index];
         final itemsInCategory = groupedItems[categoryName]!;
         final categoryIcon = itemsInCategory.first.category.icon;
-        final double categorySubtotal = itemsInCategory.fold(0.0, (sum, item) => sum + item.subtotal);
+        final double categorySubtotal =
+        itemsInCategory.fold(0.0, (sum, item) => sum + item.subtotal);
 
-        final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+        final currencyFormat =
+        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
         final formattedSubtotal = currencyFormat.format(categorySubtotal);
 
         final theme = Theme.of(context);
@@ -204,7 +227,8 @@ class ListItemsScreen extends ConsumerWidget {
               Divider(
                 height: 1,
                 thickness: 1,
-                color: (isDark ? Colors.white : theme.colorScheme.primary).withAlpha((255 * 0.15).toInt()),
+                color: (isDark ? Colors.white : theme.colorScheme.primary)
+                    .withAlpha((255 * 0.15).toInt()),
                 indent: 16,
                 endIndent: 16,
               ),
@@ -225,20 +249,24 @@ class ListItemsScreen extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     categoryName,
-                    style: TextStyle(color: headerColor, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: headerColor, fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text(
                   formattedSubtotal,
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: subHeaderColor,
-                    shadows: const [
-                      Shadow(color: Colors.black45, blurRadius: 3, offset: Offset(1, 1)),
-                    ],
-                  ),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: subHeaderColor,
+                      shadows: [
+                        const Shadow(
+                          color: Colors.black45,
+                          blurRadius: 3,
+                          offset: Offset(1, 1),
+                        )
+                      ]),
                 ),
               ],
             ),
@@ -257,7 +285,8 @@ class ListItemsScreen extends ConsumerWidget {
       ShoppingList shoppingList,
       bool isReadOnly,
       ) {
-    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    final currencyFormat =
+    NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     final quantityFormat = NumberFormat();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -266,9 +295,13 @@ class ListItemsScreen extends ConsumerWidget {
     final Color primaryColor = scheme.primary;
     final itemTitleColor = isDark
         ? (item.isChecked ? Colors.white54 : Colors.white)
-        : (item.isChecked ? primaryColor.withAlpha((255 * 0.5).toInt()) : primaryColor);
-    final itemSubtitleColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
-    final itemIconColor = isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
+        : (item.isChecked
+        ? primaryColor.withAlpha((255 * 0.5).toInt())
+        : primaryColor);
+    final itemSubtitleColor =
+    isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.7).toInt());
+    final itemIconColor =
+    isDark ? Colors.white70 : primaryColor.withAlpha((255 * 0.6).toInt());
 
     return Consumer(builder: (context, ref, child) {
       final remoteConfig = ref.watch(remoteConfigServiceProvider);
@@ -278,7 +311,8 @@ class ListItemsScreen extends ConsumerWidget {
 
       return Dismissible(
         key: Key(item.id),
-        direction: deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
+        direction:
+        deleteEnabled ? DismissDirection.endToStart : DismissDirection.none,
         confirmDismiss: deleteEnabled
             ? (direction) async {
           final bool? shouldDelete = await showGlassDialog<bool>(
@@ -315,26 +349,12 @@ class ListItemsScreen extends ConsumerWidget {
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 child: const Text('Excluir'),
               ),
             ],
           );
-
-          if (shouldDelete == true) {
-            try {
-              await viewModel.deleteItem(item.id);
-              return true;
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erro ao excluir: $e'), backgroundColor: Colors.red),
-                );
-              }
-              return false;
-            }
-          }
-          return false;
+          return shouldDelete ?? false;
         }
             : null,
         background: Container(
@@ -343,7 +363,7 @@ class ListItemsScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: const Icon(Icons.delete_forever, color: Colors.white),
         ),
-        onDismissed: null,
+        onDismissed: (_) => viewModel.deleteItem(item.id),
         child: CheckboxListTile(
           activeColor: scheme.secondary,
           checkColor: scheme.onSecondary,
@@ -358,7 +378,9 @@ class ListItemsScreen extends ConsumerWidget {
           title: Text(
             item.name,
             style: TextStyle(
-              decoration: item.isChecked ? TextDecoration.lineThrough : TextDecoration.none,
+              decoration: item.isChecked
+                  ? TextDecoration.lineThrough
+                  : TextDecoration.none,
               color: itemTitleColor,
               fontWeight: FontWeight.bold,
             ),
@@ -372,7 +394,8 @@ class ListItemsScreen extends ConsumerWidget {
               ),
               Text(
                 'Subtotal: ${currencyFormat.format(item.subtotal)}',
-                style: TextStyle(color: itemSubtitleColor, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: itemSubtitleColor, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -383,7 +406,8 @@ class ListItemsScreen extends ConsumerWidget {
               IconButton(
                 icon: Icon(Icons.edit_outlined, color: itemIconColor),
                 onPressed: () {
-                  _showItemFormModal(context, ref, shoppingList, currentTotalCost: currentTotalCost, item: item);
+                  _showItemFormModal(context, ref, shoppingList,
+                      currentTotalCost: currentTotalCost, item: item);
                 },
               ),
             ],
@@ -421,7 +445,8 @@ class _ItemsSliverAppBar extends ConsumerWidget {
     final financialSummaryEnabled = remoteConfig.isFinancialSummaryBarEnabled;
 
     final checkedItemsCount = items.where((item) => item.isChecked).length;
-    final bool isConcludeEnabled = archiveEnabled && checkedItemsCount > 0 && !shoppingList.isArchived;
+    final bool isConcludeEnabled =
+        archiveEnabled && checkedItemsCount > 0 && !shoppingList.isArchived;
 
     final Color foregroundColor = isDark ? Colors.white : Colors.black;
     final Color backgroundColor = isDark ? const Color(0xFF344049) : Colors.white;
@@ -430,7 +455,9 @@ class _ItemsSliverAppBar extends ConsumerWidget {
     final reducedFontSize = baseFontSize * 0.7;
 
     final double totalCost = items.fold(0.0, (sum, item) => sum + item.subtotal);
-    final double purchasedTotal = items.where((item) => item.isChecked).fold(0.0, (sum, item) => sum + item.subtotal);
+    final double purchasedTotal = items
+        .where((item) => item.isChecked)
+        .fold(0.0, (sum, item) => sum + item.subtotal);
 
     return SliverAppBar(
       pinned: true,
@@ -487,14 +514,17 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                 final bool? confirm = await showGlassDialog<bool>(
                   context: context,
                   title: const Text('Concluir Compra'),
-                  content: const Text('Tem certeza que deseja mover esta lista para o seu histórico?'),
+                  content: const Text(
+                      'Tem certeza que deseja mover esta lista para o seu histórico?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
                       child: const Text('Cancelar'),
                     ),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white),
                       onPressed: () => Navigator.of(context).pop(true),
                       child: const Text('Sim, Concluir'),
                     ),
@@ -505,7 +535,8 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                   if (!context.mounted) return;
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lista movida para o Histórico!')),
+                    const SnackBar(
+                        content: Text('Lista movida para o Histórico!')),
                   );
                 }
               } else if (value == 'edit') {
@@ -519,20 +550,28 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                 if (isPremium) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ListAnalysisScreen(shoppingList: shoppingList)),
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            ListAnalysisScreen(shoppingList: shoppingList)),
                   );
                 } else {
                   _showPremiumUpsell(context);
                 }
               } else if (value == 'reuse') {
                 if (isPremium) {
-                  await ref.read(historyViewModelProvider(shoppingList.ownerId).notifier).reuseList(shoppingList);
+                  await ref
+                      .read(historyViewModelProvider(shoppingList.ownerId).notifier)
+                      .reuseList(shoppingList);
                   if (!context.mounted) return;
+
+                  // <<< CORREÇÃO APLICADA AQUI >>>
                   ref.invalidate(shoppingListsStreamProvider(shoppingList.ownerId));
 
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Lista "${shoppingList.name}" reutilizada com sucesso!')),
+                    SnackBar(
+                        content: Text(
+                            'Lista "${shoppingList.name}" reutilizada com sucesso!')),
                   );
                 } else {
                   _showPremiumUpsell(context);
@@ -541,31 +580,28 @@ class _ItemsSliverAppBar extends ConsumerWidget {
             },
             itemBuilder: (BuildContext context) {
               final theme = Theme.of(context);
-              final iconColor = theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
+              final iconColor =
+              theme.colorScheme.onSurface.withAlpha((255 * 0.7).toInt());
 
               final List<PopupMenuEntry<String>> menuItems = [];
 
               if (reuseListEnabled) {
-                menuItems.add(
-                  PopupMenuItem<String>(
+                menuItems.add(PopupMenuItem<String>(
                     value: 'reuse',
                     child: IconTheme(
                       data: IconThemeData(color: iconColor),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.copy_all_rounded),
-                          SizedBox(width: 12),
-                          Text('Reutilizar Lista'),
+                          Icon(isPremium ? Icons.copy_all_rounded : Icons.lock_outline),
+                          const SizedBox(width: 12),
+                          const Text('Reutilizar Lista'),
                         ],
                       ),
-                    ),
-                  ),
-                );
+                    )));
               }
 
               if (archiveEnabled) {
-                menuItems.add(
-                  PopupMenuItem<String>(
+                menuItems.add(PopupMenuItem<String>(
                     value: 'complete',
                     enabled: isConcludeEnabled,
                     child: IconTheme(
@@ -577,14 +613,11 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                           Text('Concluir compra'),
                         ],
                       ),
-                    ),
-                  ),
-                );
+                    )));
               }
 
               if (editListEnabled) {
-                menuItems.add(
-                  PopupMenuItem<String>(
+                menuItems.add(PopupMenuItem<String>(
                     value: 'edit',
                     child: IconTheme(
                       data: IconThemeData(color: iconColor),
@@ -595,14 +628,11 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                           Text('Editar Lista'),
                         ],
                       ),
-                    ),
-                  ),
-                );
+                    )));
               }
 
               if (analysisEnabled) {
-                menuItems.add(
-                  PopupMenuItem<String>(
+                menuItems.add(PopupMenuItem<String>(
                     value: 'analysis',
                     child: IconTheme(
                       data: IconThemeData(color: iconColor),
@@ -613,9 +643,7 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                           Text('Análise da Lista'),
                         ],
                       ),
-                    ),
-                  ),
-                );
+                    )));
               }
 
               return menuItems;
@@ -654,24 +682,36 @@ class _FinancialSummaryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    final currencyFormat =
+    NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-    final bool hasBudget = shoppingList.budget != null && shoppingList.budget! > 0;
+    final bool hasBudget =
+        shoppingList.budget != null && shoppingList.budget! > 0;
     final double balance = hasBudget ? shoppingList.budget! - totalCost : 0.0;
 
-    final Color totalBgColor = isDark ? Colors.blue.shade900.withAlpha((255 * 0.3).toInt()) : Colors.blue.shade50;
-    final Color purchasedBgColor =
-    isDark ? Colors.teal.shade900.withAlpha((255 * 0.3).toInt()) : Colors.teal.shade50;
-    final Color budgetBgColor =
-    isDark ? Colors.purple.shade900.withAlpha((255 * 0.3).toInt()) : Colors.purple.shade50;
+    final Color totalBgColor = isDark
+        ? Colors.blue.shade900.withAlpha((255 * 0.3).toInt())
+        : Colors.blue.shade50;
+    final Color purchasedBgColor = isDark
+        ? Colors.teal.shade900.withAlpha((255 * 0.3).toInt())
+        : Colors.teal.shade50;
+    final Color budgetBgColor = isDark
+        ? Colors.purple.shade900.withAlpha((255 * 0.3).toInt())
+        : Colors.purple.shade50;
 
     Color balanceBgColor;
     if (balance < 0) {
-      balanceBgColor = isDark ? Colors.red.shade900.withAlpha((255 * 0.3).toInt()) : Colors.red.shade50;
+      balanceBgColor = isDark
+          ? Colors.red.shade900.withAlpha((255 * 0.3).toInt())
+          : Colors.red.shade50;
     } else if (hasBudget && shoppingList.budget! > 0 && balance <= shoppingList.budget! * 0.10) {
-      balanceBgColor = isDark ? Colors.orange.shade900.withAlpha((255 * 0.3).toInt()) : Colors.orange.shade50;
+      balanceBgColor = isDark
+          ? Colors.orange.shade900.withAlpha((255 * 0.3).toInt())
+          : Colors.orange.shade50;
     } else {
-      balanceBgColor = isDark ? Colors.green.shade900.withAlpha((255 * 0.3).toInt()) : Colors.green.shade50;
+      balanceBgColor = isDark
+          ? Colors.green.shade900.withAlpha((255 * 0.3).toInt())
+          : Colors.green.shade50;
     }
 
     final Color labelColor = isDark ? Colors.white70 : Colors.black54;
@@ -690,7 +730,8 @@ class _FinancialSummaryBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
       decoration: BoxDecoration(
         color: backgroundColor,
-        border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(80))),
+        border: Border(
+            bottom: BorderSide(color: Colors.grey.withAlpha(80))),
       ),
       child: hasBudget
           ? Row(
@@ -706,6 +747,7 @@ class _FinancialSummaryBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+
           Expanded(
             child: _FinancialInfoCard(
               backgroundColor: purchasedBgColor,
@@ -717,6 +759,7 @@ class _FinancialSummaryBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+
           Expanded(
             child: _FinancialInfoCard(
               backgroundColor: budgetBgColor,
@@ -728,6 +771,7 @@ class _FinancialSummaryBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+
           Expanded(
             child: _FinancialInfoCard(
               backgroundColor: balanceBgColor,
@@ -753,6 +797,7 @@ class _FinancialSummaryBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+
           Expanded(
             child: _FinancialInfoCard(
               backgroundColor: purchasedBgColor,
@@ -832,7 +877,297 @@ class _FinancialInfoCard extends StatelessWidget {
   }
 }
 
-/// ======= PLACEHOLDER VAZIO (Imagem + textos em container “glass”) =======
+class _AddItemForm extends ConsumerStatefulWidget {
+  final ShoppingList shoppingList;
+  final double currentTotalCost;
+  final Item? item;
+
+  const _AddItemForm(
+      {required this.shoppingList,
+        required this.currentTotalCost,
+        this.item});
+
+  @override
+  ConsumerState<_AddItemForm> createState() => _AddItemFormState();
+}
+
+class _AddItemFormState extends ConsumerState<_AddItemForm> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _priceController;
+  late TextEditingController _quantityController;
+  late TextEditingController _notesController;
+  Category? _selectedCategory;
+  String _selectedUnit = 'un';
+  bool _isPurchased = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _nameController = TextEditingController(text: item?.name);
+    _quantityController =
+        TextEditingController(text: item != null ? item.quantity.toString() : '1');
+    _notesController = TextEditingController(text: item?.notes);
+    _selectedCategory = item?.category;
+    _selectedUnit = item?.unit ?? 'un';
+    _isPurchased = item?.isChecked ?? false;
+
+    final initialPrice = item != null
+        ? NumberFormat("#,##0.00", "pt_BR").format(item.price)
+        : '';
+    _priceController = TextEditingController(text: initialPrice);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _quantityController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _saveItem() {
+    if (_formKey.currentState!.validate()) {
+      final priceText =
+      _priceController.text.replaceAll('.', '').replaceAll(',', '.');
+      final quantityText = _quantityController.text.replaceAll(',', '.');
+
+      final newItem = Item(
+        id: widget.item?.id ?? '',
+        name: _nameController.text,
+        category: _selectedCategory!,
+        price: double.tryParse(priceText) ?? 0.0,
+        quantity: double.tryParse(quantityText) ?? 1.0,
+        unit: _selectedUnit,
+        isChecked: _isPurchased,
+        notes: _notesController.text,
+        completionDate: widget.item?.completionDate,
+      );
+
+      final budget = widget.shoppingList.budget;
+      if (budget != null && budget > 0) {
+        double costDifference = newItem.subtotal;
+        if (widget.item != null) {
+          costDifference -= widget.item!.subtotal;
+        }
+        if (widget.currentTotalCost + costDifference > budget) {
+          showGlassDialog(
+            context: context,
+            title: const Text('Orçamento Excedido'),
+            content: const Text(
+                'A adição ou edição deste item ultrapassará o orçamento da lista. Exclua ou edite outros itens para continuar.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+          return;
+        }
+      }
+
+      final viewModel =
+      ref.read(listItemsViewModelProvider(widget.shoppingList.id).notifier);
+      if (widget.item == null) {
+        viewModel.addItem(newItem);
+      } else {
+        viewModel.updateItem(newItem);
+      }
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final unitsAsync = ref.watch(unitsProvider);
+    final isEditMode = widget.item != null;
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Icon(isEditMode ? Icons.edit : Icons.add_shopping_cart,
+                    color: Colors.tealAccent),
+                const SizedBox(width: 10),
+                Text(isEditMode ? 'Editar Item' : 'Adicionar Item',
+                    style: Theme.of(context).textTheme.headlineSmall),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    decoration:
+                    const InputDecoration(labelText: 'Nome do Item'),
+                    validator: (value) =>
+                    value!.isEmpty ? 'Por favor, insira um nome' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                              labelText: 'Preço', prefixText: 'R\$ '),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            CurrencyInputFormatter(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _quantityController,
+                          decoration:
+                          const InputDecoration(labelText: 'Quantidade'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+[,.]?\d{0,3}'))
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  unitsAsync.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.0),
+                      child:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    error: (err, _) => const Text('Erro ao carregar unidades'),
+                    data: (units) {
+                      if (isEditMode && !units.contains(_selectedUnit)) {
+                        units.insert(0, _selectedUnit);
+                      }
+                      return DropdownButtonFormField<String>(
+                        value:
+                        units.contains(_selectedUnit) ? _selectedUnit : null,
+                        decoration:
+                        const InputDecoration(labelText: 'Unidade'),
+                        items: units
+                            .map((unit) => DropdownMenuItem(
+                            value: unit, child: Text(unit)))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _selectedUnit = value!),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  categoriesAsync.when(
+                    loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                    error: (err, stack) =>
+                    const Text('Erro ao carregar categorias'),
+                    data: (categories) {
+                      if (isEditMode &&
+                          _selectedCategory != null &&
+                          !categories.any((c) => c.id == _selectedCategory!.id)) {
+                        categories.add(_selectedCategory!);
+                      }
+                      return DropdownButtonFormField<Category>(
+                        value: _selectedCategory,
+                        decoration:
+                        const InputDecoration(labelText: 'Categoria'),
+                        isExpanded: true,
+                        items: categories.map((category) {
+                          return DropdownMenuItem(
+                              value: category, child: Text(category.name));
+                        }).toList(),
+                        onChanged: (value) =>
+                            setState(() => _selectedCategory = value),
+                        validator: (value) => value == null
+                            ? 'Por favor, selecione uma categoria'
+                            : null,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _notesController,
+                    decoration:
+                    const InputDecoration(labelText: 'Observações'),
+                  ),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    title: const Text('Item já comprado?'),
+                    value: _isPurchased,
+                    onChanged: (value) => setState(() => _isPurchased = value),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Cancelar'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _saveItem,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Salvar'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyListPlaceholder extends StatelessWidget {
   final bool isReadOnly;
   final String assetPath;
@@ -973,266 +1308,6 @@ class _EmptyListPlaceholder extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddItemForm extends ConsumerStatefulWidget {
-  final ShoppingList shoppingList;
-  final double currentTotalCost;
-  final Item? item;
-
-  const _AddItemForm({required this.shoppingList, required this.currentTotalCost, this.item});
-
-  @override
-  ConsumerState<_AddItemForm> createState() => _AddItemFormState();
-}
-
-class _AddItemFormState extends ConsumerState<_AddItemForm> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _priceController;
-  late TextEditingController _quantityController;
-  late TextEditingController _notesController;
-  Category? _selectedCategory;
-  String _selectedUnit = 'un';
-  bool _isPurchased = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final item = widget.item;
-    _nameController = TextEditingController(text: item?.name);
-    _quantityController = TextEditingController(text: item != null ? item.quantity.toString() : '1');
-    _notesController = TextEditingController(text: item?.notes);
-    _selectedCategory = item?.category;
-    _selectedUnit = item?.unit ?? 'un';
-    _isPurchased = item?.isChecked ?? false;
-
-    final initialPrice = item != null ? NumberFormat("#,##0.00", "pt_BR").format(item.price) : '';
-    _priceController = TextEditingController(text: initialPrice);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _priceController.dispose();
-    _quantityController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  void _saveItem() {
-    if (_formKey.currentState!.validate()) {
-      final priceText = _priceController.text.replaceAll('.', '').replaceAll(',', '.');
-      final quantityText = _quantityController.text.replaceAll(',', '.');
-
-      final newItem = Item(
-        id: widget.item?.id ?? '',
-        name: _nameController.text,
-        category: _selectedCategory!,
-        price: double.tryParse(priceText) ?? 0.0,
-        quantity: double.tryParse(quantityText) ?? 1.0,
-        unit: _selectedUnit,
-        isChecked: _isPurchased,
-        notes: _notesController.text,
-        completionDate: widget.item?.completionDate,
-      );
-
-      final budget = widget.shoppingList.budget;
-      if (budget != null && budget > 0) {
-        double costDifference = newItem.subtotal;
-        if (widget.item != null) {
-          costDifference -= widget.item!.subtotal;
-        }
-        if (widget.currentTotalCost + costDifference > budget) {
-          showGlassDialog(
-            context: context,
-            title: const Text('Orçamento Excedido'),
-            content: const Text(
-                'A adição ou edição deste item ultrapassará o orçamento da lista. Exclua ou edite outros itens para continuar.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          );
-          return;
-        }
-      }
-
-      final viewModel = ref.read(listItemsViewModelProvider(widget.shoppingList.id).notifier);
-      if (widget.item == null) {
-        viewModel.addItem(newItem);
-      } else {
-        viewModel.updateItem(newItem);
-      }
-      Navigator.of(context).pop();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final unitsAsync = ref.watch(unitsProvider);
-    final isEditMode = widget.item != null;
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Icon(isEditMode ? Icons.edit : Icons.add_shopping_cart, color: Colors.tealAccent),
-                const SizedBox(width: 10),
-                Text(isEditMode ? 'Editar Item' : 'Adicionar Item', style: Theme.of(context).textTheme.headlineSmall),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Nome do Item'),
-                    validator: (value) => value!.isEmpty ? 'Por favor, insira um nome' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _priceController,
-                          decoration: const InputDecoration(labelText: 'Preço', prefixText: 'R\$ '),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            CurrencyInputFormatter(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _quantityController,
-                          decoration: const InputDecoration(labelText: 'Quantidade'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d+[,.]?\d{0,3}'))
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  unitsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20.0),
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
-                    error: (err, _) => const Text('Erro ao carregar unidades'),
-                    data: (units) {
-                      if (isEditMode && !units.contains(_selectedUnit)) {
-                        units.insert(0, _selectedUnit);
-                      }
-                      return DropdownButtonFormField<String>(
-                        value: units.contains(_selectedUnit) ? _selectedUnit : null,
-                        decoration: const InputDecoration(labelText: 'Unidade'),
-                        items: units.map((unit) => DropdownMenuItem(value: unit, child: Text(unit))).toList(),
-                        onChanged: (value) => setState(() => _selectedUnit = value!),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  categoriesAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (err, stack) => const Text('Erro ao carregar categorias'),
-                    data: (categories) {
-                      if (isEditMode &&
-                          _selectedCategory != null &&
-                          !categories.any((c) => c.id == _selectedCategory!.id)) {
-                        categories.add(_selectedCategory!);
-                      }
-                      return DropdownButtonFormField<Category>(
-                        value: _selectedCategory,
-                        decoration: const InputDecoration(labelText: 'Categoria'),
-                        isExpanded: true,
-                        items: categories
-                            .map((category) => DropdownMenuItem(value: category, child: Text(category.name)))
-                            .toList(),
-                        onChanged: (value) => setState(() => _selectedCategory = value),
-                        validator: (value) => value == null ? 'Por favor, selecione uma categoria' : null,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(labelText: 'Observações'),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Item já comprado?'),
-                    value: _isPurchased,
-                    onChanged: (value) => setState(() => _isPurchased = value),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.cancel),
-                    label: const Text('Cancelar'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _saveItem,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Salvar'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

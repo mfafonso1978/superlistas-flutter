@@ -50,7 +50,6 @@ final firebaseAuthServiceProvider = Provider<FirebaseAuthService>((ref) {
 
 final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
   final config = RemoteConfigService(FirebaseRemoteConfig.instance);
-  // Não espere pela inicialização aqui, ela será chamada no main.dart
   return config;
 });
 
