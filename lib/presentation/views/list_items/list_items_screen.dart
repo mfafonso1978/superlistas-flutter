@@ -130,16 +130,9 @@ class ListItemsScreen extends ConsumerWidget {
                       if (items.isEmpty)
                         SliverFillRemaining(
                           hasScrollBody: false,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text(
-                                isReadOnly
-                                    ? 'Esta lista não tinha itens.'
-                                    : 'Nenhum item na lista. Adicione um!',
-                                style: const TextStyle(color: Colors.white, fontSize: 16),
-                              ),
-                            ),
+                          child: _EmptyListPlaceholder( // Usando o placeholder com imagem
+                            isReadOnly: isReadOnly,
+                            assetPath: 'assets/images/empty_list.png',
                           ),
                         )
                       else
@@ -564,7 +557,6 @@ class _ItemsSliverAppBar extends ConsumerWidget {
                       .reuseList(shoppingList);
                   if (!context.mounted) return;
 
-                  // <<< CORREÇÃO APLICADA AQUI >>>
                   ref.invalidate(shoppingListsStreamProvider(shoppingList.ownerId));
 
                   Navigator.of(context).pop();
@@ -1182,7 +1174,7 @@ class _EmptyListPlaceholder extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color glass = (isDark ? const Color(0xFF2C3A43) : Colors.white).withOpacity(0.85);
+    final Color glass = (isDark ? const Color(0xFF2C3A43) : Colors.white).withAlpha((255 * 0.85).toInt());
 
     return Center(
       child: Padding(
@@ -1199,17 +1191,17 @@ class _EmptyListPlaceholder extends StatelessWidget {
                   color: glass,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.06),
+                    color: (isDark ? Colors.white : Colors.black).withAlpha((255 * 0.06).toInt()),
                     width: 1,
                   ),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [glass, glass.withOpacity(isDark ? 0.78 : 0.9)],
+                    colors: [glass, glass.withAlpha(isDark ? (255 * 0.78).toInt() : (255 * 0.9).toInt())],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
+                      color: Colors.black.withAlpha((255 * 0.18).toInt()),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -1218,7 +1210,6 @@ class _EmptyListPlaceholder extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Imagem com cantos arredondados + sombra suave
                     Opacity(
                       opacity: 0.9,
                       child: Container(
@@ -1226,7 +1217,7 @@ class _EmptyListPlaceholder extends StatelessWidget {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
+                              color: Colors.black.withAlpha((255 * 0.15).toInt()),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),
@@ -1237,7 +1228,7 @@ class _EmptyListPlaceholder extends StatelessWidget {
                           child: Image.asset(
                             assetPath,
                             width: 220,
-                            fit: BoxFit.cover, // cobre a moldura arredondada
+                            fit: BoxFit.cover,
                             filterQuality: FilterQuality.high,
                             errorBuilder: (context, error, stack) => Column(
                               children: [
@@ -1279,10 +1270,10 @@ class _EmptyListPlaceholder extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: (isDark ? Colors.teal.shade900 : Colors.teal.shade50)
-                              .withOpacity(isDark ? 0.5 : 1),
+                              .withAlpha(isDark ? (255 * 0.5).toInt() : 255),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: (isDark ? Colors.tealAccent : Colors.teal).withOpacity(0.35),
+                            color: (isDark ? Colors.tealAccent : Colors.teal).withAlpha((255 * 0.35).toInt()),
                           ),
                         ),
                         child: Wrap(
