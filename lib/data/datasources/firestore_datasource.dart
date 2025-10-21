@@ -15,7 +15,7 @@ abstract class RemoteDataSource {
   Future<void> removeMemberFromList(String listId, String memberIdToRemove);
 
   Stream<List<ItemModel>> getItemsStream(String userId, String listId);
-  Future<List<ItemModel>> getItems(String listId); // <<< NOVO MÉTODO
+  Future<List<ItemModel>> getItems(String listId);
   Future<void> saveItem(ItemModel item, String userId);
   Future<void> deleteItem(String itemId, String userId, String listId);
   Stream<List<CategoryModel>> getCategoriesStream(String userId);
@@ -40,10 +40,12 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
   CollectionReference _categoriesCollection(String userId) => _userDoc(userId).collection('categories');
   DocumentReference _unitsDoc(String userId) => _userDoc(userId).collection('app_data').doc('units');
 
+  // <<< CORREÇÃO APLICADA AQUI >>>
   @override
   Stream<List<ShoppingListModel>> getShoppingListsStream(String userId) {
     return _shoppingListsCollection
-        .where('members', arrayContains: userId)
+    // O nome do campo correto é "memberIds", não "members".
+        .where('memberIds', arrayContains: userId)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
@@ -93,7 +95,7 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
   @override
   Future<void> removeMemberFromList(String listId, String memberIdToRemove) {
     return _shoppingListsCollection.doc(listId).update({
-      'members': FieldValue.arrayRemove([memberIdToRemove])
+      'memberIds': FieldValue.arrayRemove([memberIdToRemove]) // Também corrigido aqui para consistência
     });
   }
 
@@ -117,7 +119,6 @@ class FirestoreDataSourceImpl implements RemoteDataSource {
     });
   }
 
-  // <<< NOVA IMPLEMENTAÇÃO >>>
   @override
   Future<List<ItemModel>> getItems(String listId) async {
     final snapshot = await _itemsCollection(listId).get();
@@ -239,7 +240,7 @@ extension ItemModelFirestore on ItemModel {
       'categoryId': category.id,
       'categoryName': category.name,
       'categoryIconCodePoint': category.icon.codePoint,
-      'categoryColorValue': category.colorValue,
+      'categoryColorValue': category.colorValue.value,
     };
   }
 }

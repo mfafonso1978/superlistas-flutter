@@ -7,8 +7,7 @@ import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   static const _databaseName = "Superlistas.db";
-  // <<< VERSÃO INCREMENTADA PARA ACIONAR A MIGRAÇÃO >>>
-  static const _databaseVersion = 9;
+  static const _databaseVersion = 12; // ↑ Migração para UNIQUE(userId, barcode)
 
   static const String tableUsers = 'users';
   static const String tableCategories = 'categories';
@@ -16,11 +15,12 @@ class DatabaseHelper {
   static const String tableItems = 'items';
   static const String tableUnits = 'units';
   static const String tableSyncQueue = 'sync_queue';
+  static const String tableUserProducts = 'user_products';
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
-
   static Database? _database;
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -59,7 +59,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // <<< ESTRUTURA ATUALIZADA PARA NOVAS INSTALAÇÕES >>>
     batch.execute('''
       CREATE TABLE $tableShoppingLists (
         id TEXT PRIMARY KEY,
@@ -82,9 +81,10 @@ class DatabaseHelper {
         unit TEXT NOT NULL DEFAULT 'un',
         isChecked INTEGER NOT NULL DEFAULT 0,
         notes TEXT,
-        completionDate TEXT, 
+        completionDate TEXT,
         categoryId TEXT NOT NULL,
         shoppingListId TEXT NOT NULL,
+        barcode TEXT,
         FOREIGN KEY (categoryId) REFERENCES $tableCategories (id) ON DELETE CASCADE,
         FOREIGN KEY (shoppingListId) REFERENCES $tableShoppingLists (id) ON DELETE CASCADE
       )
@@ -108,84 +108,65 @@ class DatabaseHelper {
       )
     ''');
 
-    await batch.commit(noResult: true);
+    // UNIQUE(userId, barcode) — importante para multiusuário
+    batch.execute('''
+      CREATE TABLE $tableUserProducts (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        barcode TEXT NOT NULL,
+        productName TEXT NOT NULL,
+        categoryId TEXT,
+        lastPrice REAL,
+        preferredUnit TEXT,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES $tableUsers (id) ON DELETE CASCADE,
+        FOREIGN KEY (categoryId) REFERENCES $tableCategories (id) ON DELETE SET NULL,
+        UNIQUE(userId, barcode)
+      )
+    ''');
 
+    await batch.commit(noResult: true);
     await _seedDatabase(db);
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE $tableItems ADD COLUMN completionDate TEXT');
+    if (oldVersion < 11) {
+      await db.execute('ALTER TABLE $tableItems ADD COLUMN barcode TEXT');
     }
-    if (oldVersion < 3) {
-      await db.execute('ALTER TABLE $tableItems ADD COLUMN price REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE $tableItems ADD COLUMN unit TEXT NOT NULL DEFAULT "un"');
-    }
-    if (oldVersion < 4) {
-      await db.execute('ALTER TABLE $tableShoppingLists ADD COLUMN budget REAL');
-    }
-    if (oldVersion < 5) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS $tableUsers (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          email TEXT NOT NULL UNIQUE,
-          password TEXT NOT NULL
-        )
-      ''');
-      await db.execute('ALTER TABLE $tableShoppingLists ADD COLUMN userId TEXT');
-    }
-    if (oldVersion < 6) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS $tableUnits (
-          name TEXT PRIMARY KEY
-        )
-      ''');
-      await _seedUnits(db);
-    }
-    if (oldVersion < 7) {
-      await db.execute('ALTER TABLE $tableCategories ADD COLUMN colorValue INTEGER NOT NULL DEFAULT ${Colors.grey.value}');
-      await _updateExistingCategoryColors(db);
-    }
-    if (oldVersion < 8) {
-      await db.execute('''
-        CREATE TABLE $tableSyncQueue (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId TEXT NOT NULL,
-          entityType TEXT NOT NULL,
-          entityId TEXT NOT NULL,
-          operationType TEXT NOT NULL,
-          payload TEXT,
-          timestamp TEXT NOT NULL
-        )
-      ''');
-    }
-    // <<< NOVO SCRIPT DE MIGRAÇÃO PARA A VERSÃO 9 >>>
-    if (oldVersion < 9) {
-      await db.transaction((txn) async {
-        // 1. Renomeia a coluna antiga para a nova
-        await txn.execute('ALTER TABLE $tableShoppingLists RENAME COLUMN userId TO ownerId');
-        // 2. Adiciona a nova coluna de membros
-        await txn.execute('ALTER TABLE $tableShoppingLists ADD COLUMN members TEXT');
-        // 3. Adiciona a coluna de foto de perfil na tabela de usuários
-        await txn.execute('ALTER TABLE $tableUsers ADD COLUMN photoUrl TEXT');
-      });
 
-      // 4. Preenche a nova coluna 'members' com o 'ownerId' de cada lista
-      final lists = await db.query(tableShoppingLists, columns: ['id', 'ownerId']);
-      final batch = db.batch();
-      for (final list in lists) {
-        final ownerId = list['ownerId'];
-        if (ownerId != null) {
-          batch.update(
-            tableShoppingLists,
-            {'members': jsonEncode([ownerId])}, // Cria uma lista JSON com o ownerId
-            where: 'id = ?',
-            whereArgs: [list['id']],
-          );
-        }
-      }
-      await batch.commit(noResult: true);
+    if (oldVersion < 12) {
+      // Migrar UNIQUE(barcode) -> UNIQUE(userId, barcode)
+      await db.transaction((txn) async {
+        // 1) Criar nova tabela com constraint correta
+        await txn.execute('''
+          CREATE TABLE ${tableUserProducts}_new (
+            id TEXT PRIMARY KEY,
+            userId TEXT NOT NULL,
+            barcode TEXT NOT NULL,
+            productName TEXT NOT NULL,
+            categoryId TEXT,
+            lastPrice REAL,
+            preferredUnit TEXT,
+            createdAt TEXT NOT NULL,
+            FOREIGN KEY (userId) REFERENCES $tableUsers (id) ON DELETE CASCADE,
+            FOREIGN KEY (categoryId) REFERENCES $tableCategories (id) ON DELETE SET NULL,
+            UNIQUE(userId, barcode)
+          )
+        ''');
+
+        // 2) Copiar dados (se já existirem)
+        // Como antes havia UNIQUE(barcode) global, não deve haver conflitos por usuário.
+        await txn.execute('''
+          INSERT OR IGNORE INTO ${tableUserProducts}_new
+          (id, userId, barcode, productName, categoryId, lastPrice, preferredUnit, createdAt)
+          SELECT id, userId, barcode, productName, categoryId, lastPrice, preferredUnit, createdAt
+          FROM $tableUserProducts
+        ''');
+
+        // 3) Trocar tabelas
+        await txn.execute('DROP TABLE IF EXISTS $tableUserProducts');
+        await txn.execute('ALTER TABLE ${tableUserProducts}_new RENAME TO $tableUserProducts');
+      });
     }
   }
 
@@ -201,9 +182,7 @@ class DatabaseHelper {
     Color(0xFF009688), Color(0xFF3F51B5),
   ];
 
-  Color _getColorForIndex(int index) {
-    return _baseColors[index % _baseColors.length];
-  }
+  Color _getColorForIndex(int index) => _baseColors[index % _baseColors.length];
 
   Future<void> _seedCategories(Database db) async {
     const uuid = Uuid();
@@ -232,25 +211,13 @@ class DatabaseHelper {
   }
 
   Future<void> _seedUnits(Database db) async {
-    final List<String> defaultUnits = ['un', 'pct', 'kg', 'g', 'L', 'ml', 'dz', 'm'];
+    // Mantendo alinhado à sua lista canônica aprovada
+    final List<String> defaultUnits = [
+      'un','dz','ml','L','kg','g','Caixa','Embalagem','Galão','Garrafa','Lata','Pacote','Rolo','Saco'
+    ];
     final batch = db.batch();
     for (var unit in defaultUnits) {
       batch.insert(tableUnits, {'name': unit}, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> _updateExistingCategoryColors(Database db) async {
-    final categories = await db.query(tableCategories, columns: ['id']);
-    final batch = db.batch();
-    for (var i = 0; i < categories.length; i++) {
-      final id = categories[i]['id'] as String;
-      batch.update(
-        tableCategories,
-        {'colorValue': _getColorForIndex(i).value},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
     }
     await batch.commit(noResult: true);
   }

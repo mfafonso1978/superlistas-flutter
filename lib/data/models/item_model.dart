@@ -1,12 +1,12 @@
 // lib/data/models/item_model.dart
 import 'package:superlistas/domain/entities/item.dart';
 import 'package:superlistas/data/models/category_model.dart';
-import 'package:flutter/material.dart'; // Import necessário para Color
+import 'package:flutter/material.dart';
 
 class ItemModel extends Item {
   final String shoppingListId;
 
-  ItemModel({
+  const ItemModel({
     required super.id,
     required super.name,
     required super.category,
@@ -17,50 +17,83 @@ class ItemModel extends Item {
     super.isChecked,
     super.notes,
     super.completionDate,
+    super.barcode,
   });
 
-  // Construtor antigo (mantido para compatibilidade com o SQLite)
+  /// Conversor seguro do domínio -> model (sem casts)
+  factory ItemModel.fromEntity(Item e, {required String shoppingListId}) {
+    return ItemModel(
+      id: e.id,
+      name: e.name,
+      category: CategoryModel.fromEntity(e.category),
+      shoppingListId: shoppingListId,
+      price: e.price,
+      quantity: e.quantity,
+      unit: e.unit,
+      isChecked: e.isChecked,
+      notes: e.notes,
+      completionDate: e.completionDate,
+      barcode: e.barcode,
+    );
+  }
+
   factory ItemModel.fromMap(Map<String, dynamic> map, CategoryModel category) {
     return ItemModel(
       id: map['id'],
       name: map['name'],
-      price: map['price'],
+      price: (map['price'] as num).toDouble(),
       quantity: (map['quantity'] as num).toDouble(),
       unit: map['unit'],
-      isChecked: map['isChecked'] == 1, // SQLite usa 1/0 para booleano
+      isChecked: map['isChecked'] == 1,
       notes: map['notes'],
-      completionDate: map['completionDate'] != null ? DateTime.parse(map['completionDate']) : null,
+      completionDate: map['completionDate'] != null
+          ? DateTime.parse(map['completionDate'])
+          : null,
       category: category,
       shoppingListId: map['shoppingListId'],
+      barcode: map['barcode'],
     );
   }
 
-  // Construtor para ser usado com a consulta JOIN do SQLite e também com os dados do Firestore.
-  // Ele já funciona perfeitamente para o Firestore porque espera os campos da categoria no mapa.
+  // <<< CORREÇÃO APLICADA AQUI >>>
+  /// Usado quando vem do JOIN com a tabela de categorias (local) ou do Firestore.
   factory ItemModel.fromJoinedMap(Map<String, dynamic> map) {
-    final category = CategoryModel(
-      id: map['categoryId'],
-      name: map['categoryName'],
-      icon: IconData(map['categoryIconCodePoint'], fontFamily: 'MaterialIcons'),
-      colorValue: Color(map['categoryColorValue'] ?? Colors.grey.value),
-    );
+    // A verificação agora procura pelo ID da categoria e pelo nome,
+    // que são os campos que garantem a existência de uma categoria.
+    final categoryDataExists = map['categoryId'] != null &&
+        (map['categoryName'] != null || map['category_name'] != null);
+
+    final category = categoryDataExists
+        ? CategoryModel.fromMap({
+      // Usa o ID da categoria que vem no próprio item
+      'id': map['categoryId'],
+      // Usa 'categoryName' (padrão do Firestore) ou 'category_name' (padrão do SQLite)
+      'name': map['categoryName'] ?? map['category_name'],
+      'iconCodePoint': map['categoryIconCodePoint'] ?? map['category_iconCodePoint'],
+      'colorValue': map['categoryColorValue'] ?? map['category_colorValue'],
+    })
+        : CategoryModel.uncategorized();
 
     return ItemModel(
-      id: map['id'],
-      name: map['name'],
-      price: map['price']?.toDouble() ?? 0.0,
+      id: map['id'] as String,
+      name: map['name'] as String,
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
       quantity: (map['quantity'] as num?)?.toDouble() ?? 1.0,
-      unit: map['unit'] ?? 'un',
-      // <<< MUDANÇA: Firestore salva booleano como true/false, não 1/0 >>>
-      isChecked: map['isChecked'] is bool ? map['isChecked'] : map['isChecked'] == 1,
-      notes: map['notes'],
-      completionDate: map['completionDate'] != null ? DateTime.parse(map['completionDate']) : null,
-      category: category,
-      shoppingListId: map['shoppingListId'],
+      unit: map['unit'] as String? ?? 'un',
+      isChecked: map['isChecked'] is bool
+          ? map['isChecked'] as bool
+          : (map['isChecked'] as int?) == 1,
+      notes: map['notes'] as String?,
+      completionDate: map['completionDate'] != null
+          ? DateTime.parse(map['completionDate'] as String)
+          : null,
+      category: category, // Usa a categoria corrigida
+      shoppingListId: map['shoppingListId'] as String,
+      barcode: map['barcode'] as String?,
     );
   }
 
-  // toMap para o banco de dados local (SQLite) - NÃO ALTERAR
+  /// Mapa para o **SQLite local** (mantém a coluna `categoryId`!)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -68,16 +101,16 @@ class ItemModel extends Item {
       'price': price,
       'quantity': quantity,
       'unit': unit,
-      'isChecked': isChecked ? 1 : 0, // Salva como 1 ou 0
+      'isChecked': isChecked ? 1 : 0,
       'notes': notes,
       'completionDate': completionDate?.toIso8601String(),
-      'categoryId': category.id, // Salva apenas a referência
+      'categoryId': category.id,
       'shoppingListId': shoppingListId,
+      'barcode': barcode,
     };
   }
 
-  // <<< NOVO MÉTODO: toMap específico para o Firestore >>>
-  // Este método inclui os dados denormalizados da categoria.
+  /// Mapa para **Firestore** / fila de sync
   Map<String, dynamic> toMapForFirestore() {
     return {
       'id': id,
@@ -85,16 +118,15 @@ class ItemModel extends Item {
       'price': price,
       'quantity': quantity,
       'unit': unit,
-      'isChecked': isChecked, // Salva como true ou false
+      'isChecked': isChecked,
       'notes': notes,
       'completionDate': completionDate?.toIso8601String(),
       'shoppingListId': shoppingListId,
-      // Denormalização: Salvamos os dados da categoria junto com o item
-      // para evitar múltiplas leituras ao carregar uma lista.
       'categoryId': category.id,
       'categoryName': category.name,
       'categoryIconCodePoint': category.icon.codePoint,
       'categoryColorValue': category.colorValue.value,
+      'barcode': barcode,
     };
   }
 }

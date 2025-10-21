@@ -1,9 +1,7 @@
 // lib/presentation/views/history/history_screen.dart
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:superlistas/core/ui/theme/app_backgrounds.dart';
 import 'package:superlistas/core/ui/widgets/app_background.dart';
 import 'package:superlistas/core/ui/widgets/glass_dialog.dart';
 import 'package:superlistas/domain/entities/item.dart';
@@ -45,7 +43,7 @@ class HistoryScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          AppBackground(),
+          const AppBackground(),
           RefreshIndicator(
             onRefresh: pullToRefreshEnabled
                 ? () =>
@@ -70,10 +68,11 @@ class HistoryScreen extends ConsumerWidget {
                     }
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
-                      sliver: SliverList.builder(
-                        itemCount: lists.length,
-                        itemBuilder: (context, index) =>
-                            _HistoryListItem(list: lists[index]),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                              (context, index) => _HistoryListItem(list: lists[index]),
+                          childCount: lists.length,
+                        ),
                       ),
                     );
                   },
@@ -183,7 +182,9 @@ class _HistoryListItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authViewModelProvider);
-    if (currentUser == null) return const SizedBox.shrink();
+    if (currentUser == null) {
+      return const SizedBox.shrink();
+    }
 
     final remoteConfig = ref.watch(remoteConfigServiceProvider);
     final isPremium = remoteConfig.isUserPremium;
@@ -279,7 +280,6 @@ class _HistoryListItem extends ConsumerWidget {
                               .reuseList(list);
                           if (!context.mounted) return;
 
-                          // <<< CORREÇÃO APLICADA AQUI >>>
                           ref.invalidate(shoppingListsStreamProvider(userId));
 
                           int listsTabIndex = 1;

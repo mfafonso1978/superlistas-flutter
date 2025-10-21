@@ -3,6 +3,7 @@ import 'package:superlistas/domain/entities/category.dart';
 import 'package:superlistas/domain/entities/item.dart';
 import 'package:superlistas/domain/entities/shopping_list.dart';
 import 'package:superlistas/domain/entities/stats_data.dart';
+import 'package:superlistas/domain/entities/user_product.dart';
 
 abstract class ShoppingListRepository {
   Stream<List<ShoppingList>> getShoppingListsStream(String userId);
@@ -39,4 +40,8 @@ abstract class ShoppingListRepository {
   Future<void> addUnit(String name);
   Future<void> deleteUnit(String name);
   Future<void> updateUnit(String oldName, String newName);
+
+  // --- MÉTODOS ADICIONADOS PARA O SCANNER ---
+  Future<UserProduct?> findProductByBarcode(String barcode);
+  Future<void> saveProduct(UserProduct product);
 }

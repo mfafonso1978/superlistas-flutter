@@ -1,6 +1,7 @@
 // lib/domain/entities/shopping_list.dart
 
 import 'dart:convert';
+import 'package:superlistas/data/models/shopping_list_model.dart';
 import 'package:superlistas/domain/entities/member.dart';
 
 class ShoppingList {
@@ -31,27 +32,24 @@ class ShoppingList {
   double get progress => totalItems > 0 ? checkedItems / totalItems : 0.0;
   bool get isCompleted => totalItems > 0 && totalItems == checkedItems;
 
-  factory ShoppingList.fromRichMap(Map<String, dynamic> map, {List<Member>? enrichedMembers}) {
-    List<dynamic> rawMemberList = [];
+  // <<< CORREÇÃO APLICADA AQUI >>>
+  factory ShoppingList.fromRichMap(Map<String, dynamic> map) {
+    // O mapa que vem do 'getRichShoppingListsForUser' é plano.
+    // Primeiro, criamos o ShoppingListModel a partir do mapa plano.
+    final listModel = ShoppingListModel.fromDbMap(map);
 
-    if (map['members'] is String && (map['members'] as String).isNotEmpty) {
-      rawMemberList = jsonDecode(map['members'] as String);
-    } else if (map['members'] is List) {
-      rawMemberList = map['members'];
-    }
-
-    final memberList = enrichedMembers ??
-        rawMemberList
-            .map((uid) => Member(uid: uid as String, name: 'Carregando...'))
-            .toList();
+    // Agora, usamos os dados do modelo e os dados "enriquecidos" do mapa raiz.
+    List<Member> memberList = (listModel.memberIds)
+        .map((uid) => Member(uid: uid, name: 'Carregando...'))
+        .toList();
 
     return ShoppingList(
-      id: map['id'],
-      name: map['name'],
-      creationDate: DateTime.parse(map['creationDate']),
-      isArchived: map['isArchived'] == 1,
-      budget: map['budget'],
-      ownerId: map['ownerId'] ?? map['userId'],
+      id: listModel.id,
+      name: listModel.name,
+      creationDate: listModel.creationDate,
+      isArchived: listModel.isArchived,
+      budget: listModel.budget,
+      ownerId: listModel.ownerId,
       members: memberList,
       totalItems: (map['totalItems'] as int?) ?? 0,
       checkedItems: (map['checkedItems'] as int?) ?? 0,
@@ -59,7 +57,6 @@ class ShoppingList {
     );
   }
 
-  // <<< MUDANÇA APLICADA AQUI: copyWith agora inclui os totais >>>
   ShoppingList copyWith({
     String? id,
     String? name,

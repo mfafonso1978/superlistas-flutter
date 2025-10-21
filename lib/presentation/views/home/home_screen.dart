@@ -69,6 +69,43 @@ class HomeScreen extends ConsumerWidget {
     final pullToRefreshEnabled =
         ref.watch(remoteConfigServiceProvider).isDashboardPullToRefreshEnabled;
 
+    // =======================================================================
+    // <<< CÓDIGO DE DIAGNÓSTICO ADICIONADO AQUI >>>
+    // Este bloco vai capturar o erro exato e imprimir no console.
+    // =======================================================================
+    List<Widget> slivers;
+    try {
+      slivers = dashboardDataAsync.when(
+        loading: () => _buildLoadingSlivers(context),
+        error: (err, stack) {
+          // Imprime o erro original no console para depuração
+          print(">>>>>> ERRO CAPTURADO NO DASHBOARD VIEW MODEL: $err");
+          print(">>>>>> STACK TRACE COMPLETO:");
+          print(stack);
+          return _buildErrorSlivers('$err');
+        },
+        data: (data) {
+          if (data == null) {
+            return _buildErrorSlivers('Os dados do dashboard retornaram nulos.');
+          }
+          return _buildDataSlivers(
+            context: context,
+            ref: ref,
+            userId: userId,
+            data: data,
+          );
+        },
+      );
+    } catch (e, s) {
+      print(">>>>>> ERRO CRÍTICO CAPTURADO NO WIDGET BUILD: $e");
+      print(">>>>>> STACK TRACE COMPLETO:");
+      print(s);
+      slivers = _buildErrorSlivers('$e');
+    }
+    // =======================================================================
+    // FIM DO CÓDIGO DE DIAGNÓSTICO
+    // =======================================================================
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -86,16 +123,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               slivers: [
                 _DashboardSliverAppBar(user: user),
-                ...dashboardDataAsync.when(
-                  loading: () => _buildLoadingSlivers(context),
-                  error: (err, _) => _buildErrorSlivers('$err'),
-                  data: (data) => _buildDataSlivers(
-                    context: context,
-                    ref: ref,
-                    userId: userId,
-                    data: data,
-                  ),
-                ),
+                ...slivers, // Usando a lista de slivers que foi processada com segurança
                 SliverPadding(
                   padding: EdgeInsets.only(
                     bottom: _contentBottomInset(context),
@@ -363,7 +391,7 @@ List<Widget> _buildDataSlivers({
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
-          child: _SectionTitle('Ações Rápidas',
+          child: const _SectionTitle('Ações Rápidas',
               icon: Icons.flash_on_rounded),
         ),
       ),
@@ -379,7 +407,6 @@ List<Widget> _buildDataSlivers({
         ),
       ),
       if (data.recentLists.isEmpty)
-      // >>>>> NOVO PLACEHOLDER PARA "NENHUMA LISTA CRIADA" (HOME)
         SliverToBoxAdapter(
           child: _EmptyShoppingListHome(
             assetPath: 'assets/images/cesta.jpg',
@@ -412,9 +439,9 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
       ),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
-    SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: const SliverToBoxAdapter(
+    const SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverToBoxAdapter(
           child: _ShimmerBox(h: 24, r: 8, w: 160)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
@@ -432,9 +459,9 @@ List<Widget> _buildLoadingSlivers(BuildContext context) {
       ),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 24)),
-    SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: const SliverToBoxAdapter(
+    const SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverToBoxAdapter(
           child: _ShimmerBox(h: 24, r: 8, w: 180)),
     ),
     const SliverToBoxAdapter(child: SizedBox(height: 14)),
@@ -1021,96 +1048,6 @@ class _RecentHeader extends ConsumerWidget {
   }
 }
 
-class _EmptyRecent extends ConsumerWidget {
-  final String userId;
-
-  const _EmptyRecent({required this.userId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-            scheme.surface.withAlpha((255 * 0.8).toInt()),
-            scheme.surface.withAlpha((255 * 0.6).toInt()),
-          ]
-              : [
-            Colors.white.withAlpha((255 * 0.75).toInt()),
-            Colors.white.withAlpha((255 * 0.55).toInt()),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark
-              ? scheme.outline.withAlpha((255 * 0.2).toInt())
-              : scheme.outline.withAlpha((255 * 0.1).toInt()),
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: scheme.secondary
-                    .withAlpha((255 * 0.1).toInt()),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.shopping_cart_outlined,
-                color: scheme.secondary,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Nenhuma lista criada ainda',
-              style:
-              Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: scheme.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Comece criando sua primeira lista de compras',
-              style: TextStyle(color: scheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            if (ref
-                .watch(remoteConfigServiceProvider)
-                .isAddListEnabled)
-              FilledButton.icon(
-                onPressed: () {
-                  showAddOrEditListDialog(
-                      context: context, ref: ref, userId: userId);
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Criar primeira lista'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
-                  backgroundColor: scheme.secondary,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _RecentHorizontalList extends StatelessWidget {
   final String userId;
   final List<ShoppingList> lists;
@@ -1539,10 +1476,6 @@ class _ListTemplate {
   });
 }
 
-/// ===============================================================
-/// WIDGET: LISTA DE COMPRAS AINDA NÃO CRIADA (HOME)
-/// Visual com glass, imagem arredondada e botão de criar lista.
-/// ===============================================================
 class _EmptyShoppingListHome extends ConsumerWidget {
   final String assetPath;
   final String userId;
@@ -1560,8 +1493,8 @@ class _EmptyShoppingListHome extends ConsumerWidget {
         ref.watch(remoteConfigServiceProvider).isAddListEnabled;
     final colorScheme = theme.colorScheme;
 
-    final Color glassColor =
-    (isDark ? const Color(0xFF2C3A43) : Colors.white).withOpacity(0.85);
+    final Color glassColor = (isDark ? const Color(0xFF2C3A43) : Colors.white)
+        .withAlpha((255 * 0.85).toInt());
 
     return Center(
       child: Padding(
@@ -1576,8 +1509,8 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                 color: glassColor,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color:
-                  (isDark ? Colors.white : Colors.black).withOpacity(0.06),
+                  color: (isDark ? Colors.white : Colors.black)
+                      .withAlpha((255 * 0.06).toInt()),
                   width: 1,
                 ),
                 gradient: LinearGradient(
@@ -1585,12 +1518,14 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     glassColor,
-                    glassColor.withOpacity(isDark ? 0.75 : 0.9),
+                    glassColor.withAlpha(isDark
+                        ? (255 * 0.75).toInt()
+                        : (255 * 0.9).toInt()),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
+                    color: Colors.black.withAlpha((255 * 0.18).toInt()),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -1599,13 +1534,12 @@ class _EmptyShoppingListHome extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // IMAGEM
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withAlpha((255 * 0.15).toInt()),
                           blurRadius: 15,
                           offset: const Offset(0, 6),
                         ),
@@ -1624,8 +1558,6 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 28),
-
-                  // TÍTULO
                   Text(
                     'Nenhuma lista de compras criada',
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -1634,10 +1566,7 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                   const SizedBox(height: 10),
-
-                  // SUBTÍTULO
                   Text(
                     'Crie sua primeira lista e comece a planejar suas compras com praticidade!',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -1646,10 +1575,7 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                   const SizedBox(height: 24),
-
-                  // BOTÃO
                   if (canCreateList)
                     FilledButton.icon(
                       onPressed: () {
@@ -1672,10 +1598,7 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                         elevation: 6,
                       ),
                     ),
-
                   const SizedBox(height: 18),
-
-                  // DICA
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
@@ -1683,13 +1606,13 @@ class _EmptyShoppingListHome extends ConsumerWidget {
                       color: (isDark
                           ? Colors.teal.shade900
                           : Colors.teal.shade50)
-                          .withOpacity(isDark ? 0.6 : 1),
+                          .withAlpha(isDark ? (255 * 0.6).toInt() : 255),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: (isDark
                             ? Colors.tealAccent
                             : Colors.teal)
-                            .withOpacity(0.35),
+                            .withAlpha((255 * 0.35).toInt()),
                       ),
                     ),
                     child: Row(

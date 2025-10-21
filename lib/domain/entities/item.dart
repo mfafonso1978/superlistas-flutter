@@ -1,9 +1,10 @@
+// lib/domain/entities/item.dart
 import 'package:superlistas/domain/entities/category.dart';
+import 'package:equatable/equatable.dart';
 
-class Item {
+class Item extends Equatable {
   final String id;
   final String name;
-  // --- ATUALIZAÇÃO: Novos campos e tipo de dado alterado ---
   final double price;
   final double quantity;
   final String unit;
@@ -11,8 +12,9 @@ class Item {
   final Category category;
   final String? notes;
   final DateTime? completionDate;
+  final String? barcode; // <<< CAMPO ADICIONADO AQUI
 
-  Item({
+  const Item({
     required this.id,
     required this.name,
     required this.category,
@@ -22,12 +24,27 @@ class Item {
     this.isChecked = false,
     this.notes,
     this.completionDate,
+    this.barcode, // <<< CAMPO ADICIONADO AQUI
   });
 
-  // Helper para calcular o subtotal do item
   double get subtotal => price * quantity;
 
+  @override
+  List<Object?> get props => [
+    id,
+    name,
+    category,
+    price,
+    quantity,
+    unit,
+    isChecked,
+    notes,
+    completionDate,
+    barcode, // <<< CAMPO ADICIONADO AQUI
+  ];
+
   Item copyWith({
+    String? id,
     String? name,
     double? price,
     double? quantity,
@@ -36,9 +53,10 @@ class Item {
     Category? category,
     String? notes,
     DateTime? completionDate,
+    String? barcode,
   }) {
     return Item(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       category: category ?? this.category,
       price: price ?? this.price,
@@ -47,6 +65,7 @@ class Item {
       isChecked: isChecked ?? this.isChecked,
       notes: notes ?? this.notes,
       completionDate: (isChecked == false) ? null : (completionDate ?? this.completionDate),
+      barcode: barcode ?? this.barcode,
     );
   }
 }

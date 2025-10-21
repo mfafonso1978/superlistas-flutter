@@ -1,8 +1,5 @@
 // lib/core/errors/exceptions.dart
 
-// (Este arquivo pode ter outras exceções, mantenha-as)
-// Adicione estas duas no final do arquivo:
-
 class UserNotFoundException implements Exception {
   final String message;
   UserNotFoundException({this.message = 'Usuário não encontrado.'});
@@ -11,4 +8,11 @@ class UserNotFoundException implements Exception {
 class PasswordUpdateException implements Exception {
   final String message;
   PasswordUpdateException({this.message = 'Falha ao atualizar a senha.'});
+}
+
+// <<< NOVO <<<
+/// Lançada ao tentar adicionar um item que já existe na lista.
+class DuplicateItemException implements Exception {
+  final String message;
+  DuplicateItemException(this.message);
 }

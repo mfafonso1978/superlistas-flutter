@@ -15,6 +15,16 @@ class CategoryModel extends Category {
     colorValue: colorValue,
   );
 
+  /// Domain -> Model (usado por ItemModel.fromEntity e no repositório)
+  factory CategoryModel.fromEntity(Category c) {
+    return CategoryModel(
+      id: c.id,
+      name: c.name,
+      icon: c.icon,
+      colorValue: c.colorValue,
+    );
+  }
+
   factory CategoryModel.fromMap(Map<String, dynamic> map) {
     return CategoryModel(
       id: map['id'],
@@ -31,5 +41,14 @@ class CategoryModel extends Category {
       'iconCodePoint': icon.codePoint,
       'colorValue': colorValue.value,
     };
+  }
+
+  factory CategoryModel.uncategorized() {
+    return CategoryModel(
+      id: 'uncategorized_id',
+      name: 'Sem Categoria',
+      icon: Icons.label_off_outlined,
+      colorValue: Colors.grey,
+    );
   }
 }

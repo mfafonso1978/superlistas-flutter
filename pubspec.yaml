@@ -2,7 +2,7 @@ name: superlistas
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.4.0+6
+version: 1.5.0+7
 
 environment:
   sdk: '>=3.0.0'
@@ -27,15 +27,21 @@ dependencies:
   file_selector: ^1.0.3
   lottie: ^3.1.0
 
-  # <<< MUDANÇA PRINCIPAL AQUI: Pacotes Firebase atualizados para compatibilidade >>>
+  # Pacotes Firebase
   firebase_core: ^3.1.1
   firebase_auth: ^5.1.1
   google_sign_in: ^6.2.1
   firebase_remote_config: ^5.0.0
+  # <<< ADICIONE ESTA LINHA >>>
+  firebase_analytics: ^11.0.0
   package_info_plus: ^8.0.0
   url_launcher: ^6.3.1
   cloud_firestore: ^5.0.2
   connectivity_plus: ^6.0.3
+  equatable: ^2.0.5
+
+  # Scanner de código de barras (ATUALIZADO)
+  mobile_scanner: ^5.2.3
 
 dev_dependencies:
   flutter_test:

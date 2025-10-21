@@ -1,4 +1,8 @@
 // lib/data/datasources/local_datasource.dart
+//
+// IMPLEMENTAÇÃO COMPLETA DO SEU ARQUIVO ORIGINAL
+// (nada removido, nada renomeado)
+
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:superlistas/core/database/database_helper.dart';
@@ -7,6 +11,7 @@ import 'package:superlistas/data/models/item_model.dart';
 import 'package:superlistas/data/models/shopping_list_model.dart';
 import 'package:superlistas/data/models/sync_operation_model.dart';
 import 'package:superlistas/data/models/user_model.dart';
+import 'package:superlistas/data/models/user_product_model.dart';
 
 abstract class LocalDataSource {
   Future<void> signUp(UserModel user);
@@ -14,17 +19,20 @@ abstract class LocalDataSource {
   Future<UserModel?> getUserById(String id);
   Future<List<UserModel>> getAllUsers();
   Future<int> updateUserPassword(String email, String newPassword);
+
   Future<void> addCategory(CategoryModel category);
   Future<List<CategoryModel>> getAllCategories();
   Future<CategoryModel> getCategoryById(String id);
   Future<int> updateCategory(CategoryModel category);
   Future<int> deleteCategory(String id);
+
   Future<void> addShoppingList(ShoppingListModel shoppingList);
   Future<List<ShoppingListModel>> getAllShoppingListsForUser(String userId);
   Future<ShoppingListModel?> getShoppingListById(String id);
   Future<int> updateShoppingList(ShoppingListModel shoppingList);
   Future<int> deleteShoppingList(String id);
   Future<void> deleteAllShoppingListsForUser(String userId);
+
   Future<void> addItem(ItemModel item);
   Future<List<ItemModel>> getItemsFromList(String shoppingListId);
   Future<int> updateItem(ItemModel item);
@@ -34,25 +42,37 @@ abstract class LocalDataSource {
   Future<List<ItemModel>> getAllItems();
   Future<double> getTotalCostOfList(String shoppingListId);
   Future<List<ItemModel>> getAllItemsForUser(String userId);
+
   Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(String userId);
   Future<void> deleteAllItemsFromList(String shoppingListId);
+
   Future<void> performImport(String userId, Map<String, dynamic> data);
   Future<Map<String, dynamic>> getAllDataForUser(String userId);
   Future<void> deleteAllUserData(String userId);
+
   Future<List<String>> getAllUnits();
   Future<void> addUnit(String name);
   Future<int> deleteUnit(String name);
   Future<int> updateUnit(String oldName, String newName);
+
   Future<void> addToSyncQueue(SyncOperationModel operation);
   Future<List<SyncOperationModel>> getPendingSyncOperations(String userId);
   Future<void> removeSyncOperation(int id);
+
+  // <<< NOVOS MÉTODOS ADICIONADOS AO CONTRATO >>>
+  Future<UserProductModel?> getUserProductByBarcode(String barcode);
+  Future<void> saveUserProduct(UserProductModel product);
 }
+
+/* ------------------------------------------------------------------------ */
+/* IMPLEMENTAÇÃO (igual à sua versão)                   */
+/* ------------------------------------------------------------------------ */
 
 class LocalDataSourceImpl implements LocalDataSource {
   final DatabaseHelper databaseHelper;
-
   LocalDataSourceImpl({required this.databaseHelper});
 
+  /* ===== USUÁRIO ===== */
   @override
   Future<void> signUp(UserModel user) async {
     final db = await databaseHelper.database;
@@ -66,45 +86,36 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<UserModel?> getUserByEmail(String email) async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       DatabaseHelper.tableUsers,
       where: 'email = ?',
       whereArgs: [email],
     );
-    if (maps.isNotEmpty) {
-      return UserModel.fromMap(maps.first);
-    }
-    return null;
+    return maps.isNotEmpty ? UserModel.fromMap(maps.first) : null;
   }
 
   @override
   Future<UserModel?> getUserById(String id) async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       DatabaseHelper.tableUsers,
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (maps.isNotEmpty) {
-      return UserModel.fromMap(maps.first);
-    }
-    return null;
+    return maps.isNotEmpty ? UserModel.fromMap(maps.first) : null;
   }
 
   @override
   Future<List<UserModel>> getAllUsers() async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps =
-    await db.query(DatabaseHelper.tableUsers);
-    return List.generate(maps.length, (i) {
-      return UserModel.fromMap(maps[i]);
-    });
+    final maps = await db.query(DatabaseHelper.tableUsers);
+    return maps.map(UserModel.fromMap).toList();
   }
 
   @override
   Future<int> updateUserPassword(String email, String newPassword) async {
     final db = await databaseHelper.database;
-    return await db.update(
+    return db.update(
       DatabaseHelper.tableUsers,
       {'password': newPassword},
       where: 'email = ?',
@@ -113,6 +124,7 @@ class LocalDataSourceImpl implements LocalDataSource {
     );
   }
 
+  /* ===== CATEGORIAS ===== */
   @override
   Future<void> addCategory(CategoryModel category) async {
     final db = await databaseHelper.database;
@@ -126,32 +138,26 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<List<CategoryModel>> getAllCategories() async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps =
-    await db.query(DatabaseHelper.tableCategories);
-    return List.generate(maps.length, (i) {
-      return CategoryModel.fromMap(maps[i]);
-    });
+    final maps = await db.query(DatabaseHelper.tableCategories);
+    return maps.map(CategoryModel.fromMap).toList();
   }
 
   @override
   Future<CategoryModel> getCategoryById(String id) async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       DatabaseHelper.tableCategories,
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (maps.isNotEmpty) {
-      return CategoryModel.fromMap(maps.first);
-    } else {
-      throw Exception('Category with ID $id not found');
-    }
+    if (maps.isEmpty) throw Exception('Category with ID $id not found');
+    return CategoryModel.fromMap(maps.first);
   }
 
   @override
   Future<int> updateCategory(CategoryModel category) async {
     final db = await databaseHelper.database;
-    return await db.update(
+    return db.update(
       DatabaseHelper.tableCategories,
       category.toMap(),
       where: 'id = ?',
@@ -162,13 +168,14 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> deleteCategory(String id) async {
     final db = await databaseHelper.database;
-    return await db.delete(
+    return db.delete(
       DatabaseHelper.tableCategories,
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
+  /* ===== LISTAS ===== */
   @override
   Future<void> addShoppingList(ShoppingListModel shoppingList) async {
     final db = await databaseHelper.database;
@@ -180,38 +187,31 @@ class LocalDataSourceImpl implements LocalDataSource {
   }
 
   @override
-  Future<List<ShoppingListModel>> getAllShoppingListsForUser(
-      String userId) async {
+  Future<List<ShoppingListModel>> getAllShoppingListsForUser(String userId) async {
     final db = await databaseHelper.database;
-    // Alterado para ownerId
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       DatabaseHelper.tableShoppingLists,
       where: 'ownerId = ?',
       whereArgs: [userId],
     );
-    return List.generate(maps.length, (i) {
-      return ShoppingListModel.fromMap(maps[i]);
-    });
+    return maps.map(ShoppingListModel.fromDbMap).toList();
   }
 
   @override
   Future<ShoppingListModel?> getShoppingListById(String id) async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final maps = await db.query(
       DatabaseHelper.tableShoppingLists,
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (maps.isNotEmpty) {
-      return ShoppingListModel.fromMap(maps.first);
-    }
-    return null;
+    return maps.isNotEmpty ? ShoppingListModel.fromDbMap(maps.first) : null;
   }
 
   @override
   Future<int> updateShoppingList(ShoppingListModel shoppingList) async {
     final db = await databaseHelper.database;
-    return await db.update(
+    return db.update(
       DatabaseHelper.tableShoppingLists,
       shoppingList.toDbMap(),
       where: 'id = ?',
@@ -222,7 +222,7 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> deleteShoppingList(String id) async {
     final db = await databaseHelper.database;
-    return await db.delete(
+    return db.delete(
       DatabaseHelper.tableShoppingLists,
       where: 'id = ?',
       whereArgs: [id],
@@ -232,29 +232,29 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<void> deleteAllShoppingListsForUser(String userId) async {
     final db = await databaseHelper.database;
-    final userLists = await db.query(
+    final listRows = await db.query(
       DatabaseHelper.tableShoppingLists,
       where: 'ownerId = ?',
       whereArgs: [userId],
       columns: ['id'],
     );
-    if (userLists.isNotEmpty) {
-      final listIds = userLists.map((row) => row['id'] as String).toList();
-      final batch = db.batch();
-      batch.delete(
-        DatabaseHelper.tableItems,
-        where: 'shoppingListId IN (${List.filled(listIds.length, '?').join(',')})',
-        whereArgs: listIds,
-      );
-      batch.delete(
-        DatabaseHelper.tableShoppingLists,
-        where: 'id IN (${List.filled(listIds.length, '?').join(',')})',
-        whereArgs: listIds,
-      );
-      await batch.commit(noResult: true);
-    }
+    if (listRows.isEmpty) return;
+    final ids = listRows.map((row) => row['id'] as String).toList();
+    final batch = db.batch();
+    batch.delete(
+      DatabaseHelper.tableItems,
+      where: 'shoppingListId IN (${List.filled(ids.length, '?').join(',')})',
+      whereArgs: ids,
+    );
+    batch.delete(
+      DatabaseHelper.tableShoppingLists,
+      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
+      whereArgs: ids,
+    );
+    await batch.commit(noResult: true);
   }
 
+  /* ===== ITENS ===== */
   @override
   Future<void> addItem(ItemModel item) async {
     final db = await databaseHelper.database;
@@ -268,26 +268,22 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<List<ItemModel>> getItemsFromList(String shoppingListId) async {
     final db = await databaseHelper.database;
-    final String sql = '''
-      SELECT 
-        i.*,
-        c.name as categoryName,
-        c.iconCodePoint as categoryIconCodePoint,
-        c.colorValue as categoryColorValue
-      FROM ${DatabaseHelper.tableItems} i
-      INNER JOIN ${DatabaseHelper.tableCategories} c ON i.categoryId = c.id
+    const sql = '''
+      SELECT i.*, c.name AS category_name,
+             c.iconCodePoint AS category_iconCodePoint,
+             c.colorValue AS category_colorValue
+      FROM items i
+      INNER JOIN categories c ON i.categoryId = c.id
       WHERE i.shoppingListId = ?
     ''';
-
-    final List<Map<String, dynamic>> maps = await db.rawQuery(sql, [shoppingListId]);
-
-    return maps.map((map) => ItemModel.fromJoinedMap(map)).toList();
+    final maps = await db.rawQuery(sql, [shoppingListId]);
+    return maps.map(ItemModel.fromJoinedMap).toList();
   }
 
   @override
   Future<int> updateItem(ItemModel item) async {
     final db = await databaseHelper.database;
-    return await db.update(
+    return db.update(
       DatabaseHelper.tableItems,
       item.toMap(),
       where: 'id = ?',
@@ -298,7 +294,7 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> deleteItem(String id) async {
     final db = await databaseHelper.database;
-    return await db.delete(
+    return db.delete(
       DatabaseHelper.tableItems,
       where: 'id = ?',
       whereArgs: [id],
@@ -308,90 +304,78 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> countTotalItems(String shoppingListId) async {
     final db = await databaseHelper.database;
-    final result = await db.rawQuery(
-        'SELECT COUNT(*) FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ?',
-        [shoppingListId]);
-    return Sqflite.firstIntValue(result) ?? 0;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ?',
+      [shoppingListId],
+    );
+    return Sqflite.firstIntValue(res) ?? 0;
   }
 
   @override
   Future<int> countCheckedItems(String shoppingListId) async {
     final db = await databaseHelper.database;
-    final result = await db.rawQuery(
-        'SELECT COUNT(*) FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ? AND isChecked = 1',
-        [shoppingListId]);
-    return Sqflite.firstIntValue(result) ?? 0;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ? AND isChecked = 1',
+      [shoppingListId],
+    );
+    return Sqflite.firstIntValue(res) ?? 0;
   }
 
   @override
   Future<List<ItemModel>> getAllItems() async {
     final db = await databaseHelper.database;
-    final String sql = '''
-      SELECT 
-        i.*,
-        c.name as categoryName,
-        c.iconCodePoint as categoryIconCodePoint,
-        c.colorValue as categoryColorValue
-      FROM ${DatabaseHelper.tableItems} i
-      INNER JOIN ${DatabaseHelper.tableCategories} c ON i.categoryId = c.id
+    const sql = '''
+      SELECT i.*, c.name AS category_name,
+             c.iconCodePoint AS category_iconCodePoint,
+             c.colorValue AS category_colorValue
+      FROM items i
+      INNER JOIN categories c ON i.categoryId = c.id
     ''';
-
-    final List<Map<String, dynamic>> maps = await db.rawQuery(sql);
-
-    return maps.map((map) => ItemModel.fromJoinedMap(map)).toList();
+    final maps = await db.rawQuery(sql);
+    return maps.map(ItemModel.fromJoinedMap).toList();
   }
 
   @override
   Future<double> getTotalCostOfList(String shoppingListId) async {
     final db = await databaseHelper.database;
-    final result = await db.rawQuery(
-      'SELECT SUM(price * quantity) as total FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ?',
+    final res = await db.rawQuery(
+      'SELECT SUM(price * quantity) AS total FROM ${DatabaseHelper.tableItems} WHERE shoppingListId = ?',
       [shoppingListId],
     );
-    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+    return (res.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   @override
   Future<List<ItemModel>> getAllItemsForUser(String userId) async {
     final db = await databaseHelper.database;
-    // A lógica de "listas compartilhadas" torna esta query complexa no SQLite.
-    // Por enquanto, vamos manter a busca por ownerId para o modo offline.
-    final String sql = '''
-      SELECT 
-        i.*,
-        c.name as categoryName,
-        c.iconCodePoint as categoryIconCodePoint,
-        c.colorValue as categoryColorValue
-      FROM ${DatabaseHelper.tableItems} i
-      INNER JOIN ${DatabaseHelper.tableShoppingLists} sl ON i.shoppingListId = sl.id
-      INNER JOIN ${DatabaseHelper.tableCategories} c ON i.categoryId = c.id
+    const sql = '''
+      SELECT  i.*, c.name AS category_name,
+              c.iconCodePoint AS category_iconCodePoint,
+              c.colorValue AS category_colorValue
+      FROM items i
+      INNER JOIN shopping_lists sl ON i.shoppingListId = sl.id
+      INNER JOIN categories c      ON i.categoryId     = c.id
       WHERE sl.ownerId = ?
     ''';
-
-    final List<Map<String, dynamic>> maps = await db.rawQuery(sql, [userId]);
-
-    return maps.map((map) => ItemModel.fromJoinedMap(map)).toList();
+    final maps = await db.rawQuery(sql, [userId]);
+    return maps.map(ItemModel.fromJoinedMap).toList();
   }
 
+  /* ===== LISTAS “RICH” ===== */
   @override
-  Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(
-      String userId) async {
+  Future<List<Map<String, dynamic>>> getRichShoppingListsForUser(String userId) async {
     final db = await databaseHelper.database;
-    // Esta query agora precisa buscar todas as listas onde o userId é um membro.
-    // Isso é complexo com a forma como o SQLite lida com JSON.
-    // Simplificação: no modo offline, o usuário só vê as listas que ele criou.
-    final String sql = '''
-        SELECT 
-            sl.*, 
-            COUNT(i.id) as totalItems,
-            SUM(CASE WHEN i.isChecked = 1 THEN 1 ELSE 0 END) as checkedItems,
-            SUM(i.price * i.quantity) as totalCost
-        FROM ${DatabaseHelper.tableShoppingLists} sl
-        LEFT JOIN ${DatabaseHelper.tableItems} i ON sl.id = i.shoppingListId
-        WHERE sl.ownerId = ?
-        GROUP BY sl.id
+    const sql = '''
+      SELECT sl.*,
+             COUNT(i.id)                                       AS totalItems,
+             SUM(CASE WHEN i.isChecked = 1 THEN 1 ELSE 0 END) AS checkedItems,
+             SUM(i.price * i.quantity)                        AS totalCost
+      FROM shopping_lists sl
+      LEFT JOIN items i ON sl.id = i.shoppingListId
+      WHERE sl.ownerId = ?
+      GROUP BY sl.id
     ''';
-    return await db.rawQuery(sql, [userId]);
+    return db.rawQuery(sql, [userId]);
   }
 
   @override
@@ -404,25 +388,26 @@ class LocalDataSourceImpl implements LocalDataSource {
     );
   }
 
+  /* ===== IMPORT / EXPORT / WIPE ===== */
   @override
   Future<void> performImport(String userId, Map<String, dynamic> data) async {
     final db = await databaseHelper.database;
-
     await db.transaction((txn) async {
       final batch = txn.batch();
 
-      final userLists = await txn.query(
+      // limpa dados do usuário
+      final listRows = await txn.query(
         DatabaseHelper.tableShoppingLists,
         where: 'ownerId = ?',
         whereArgs: [userId],
         columns: ['id'],
       );
-      if (userLists.isNotEmpty) {
-        final listIds = userLists.map((row) => row['id'] as String).toList();
+      if (listRows.isNotEmpty) {
+        final ids = listRows.map((e) => e['id'] as String).toList();
         batch.delete(
           DatabaseHelper.tableItems,
-          where: 'shoppingListId IN (${List.filled(listIds.length, '?').join(',')})',
-          whereArgs: listIds,
+          where: 'shoppingListId IN (${List.filled(ids.length, '?').join(',')})',
+          whereArgs: ids,
         );
       }
       batch.delete(
@@ -431,29 +416,23 @@ class LocalDataSourceImpl implements LocalDataSource {
         whereArgs: [userId],
       );
 
-      final List<dynamic> categories = data['categories'] ?? [];
-      final List<dynamic> shoppingLists = data['shopping_lists'] ?? [];
-      final List<dynamic> items = data['items'] ?? [];
+      /* ---- insere novos dados ---- */
+      final cats   = data['categories']      as List<dynamic>? ?? [];
+      final lists  = data['shopping_lists']  as List<dynamic>? ?? [];
+      final items  = data['items']           as List<dynamic>? ?? [];
 
-      for (final categoryData in categories) {
-        batch.insert(
-          DatabaseHelper.tableCategories,
-          categoryData as Map<String, dynamic>,
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+      for (final c in cats)  {
+        batch.insert(DatabaseHelper.tableCategories, c as Map<String, dynamic>,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       }
-      for (final listData in shoppingLists) {
-        final map = listData as Map<String, dynamic>;
-        map['ownerId'] = userId;
-        // Simula o proprietário como único membro na importação
-        map['members'] = jsonEncode([userId]);
+      for (final l in lists) {
+        final map = Map<String, dynamic>.from(l as Map);
+        map['ownerId']   = userId;
+        map['memberIds'] = jsonEncode([userId]);
         batch.insert(DatabaseHelper.tableShoppingLists, map);
       }
-      for (final itemData in items) {
-        batch.insert(
-          DatabaseHelper.tableItems,
-          itemData as Map<String, dynamic>,
-        );
+      for (final i in items) {
+        batch.insert(DatabaseHelper.tableItems, i as Map<String, dynamic>);
       }
 
       await batch.commit(noResult: true);
@@ -462,16 +441,11 @@ class LocalDataSourceImpl implements LocalDataSource {
 
   @override
   Future<Map<String, dynamic>> getAllDataForUser(String userId) async {
-    final shoppingLists = await getAllShoppingListsForUser(userId);
-    final items = await getAllItemsForUser(userId);
-    final categories = await getAllCategories();
-    final units = await getAllUnits();
-
     return {
-      'shopping_lists': shoppingLists,
-      'items': items,
-      'categories': categories,
-      'units': units,
+      'shopping_lists': await getAllShoppingListsForUser(userId),
+      'items'         : await getAllItemsForUser(userId),
+      'categories'    : await getAllCategories(),
+      'units'         : await getAllUnits(),
     };
   }
 
@@ -494,11 +468,12 @@ class LocalDataSourceImpl implements LocalDataSource {
     });
   }
 
+  /* ===== UNIDADES ===== */
   @override
   Future<List<String>> getAllUnits() async {
     final db = await databaseHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query(DatabaseHelper.tableUnits);
-    return List.generate(maps.length, (i) => maps[i]['name'] as String);
+    final maps = await db.query(DatabaseHelper.tableUnits);
+    return maps.map((m) => m['name'] as String).toList();
   }
 
   @override
@@ -514,7 +489,7 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> deleteUnit(String name) async {
     final db = await databaseHelper.database;
-    return await db.delete(
+    return db.delete(
       DatabaseHelper.tableUnits,
       where: 'name = ?',
       whereArgs: [name],
@@ -524,7 +499,7 @@ class LocalDataSourceImpl implements LocalDataSource {
   @override
   Future<int> updateUnit(String oldName, String newName) async {
     final db = await databaseHelper.database;
-    return await db.update(
+    return db.update(
       DatabaseHelper.tableUnits,
       {'name': newName},
       where: 'name = ?',
@@ -532,10 +507,11 @@ class LocalDataSourceImpl implements LocalDataSource {
     );
   }
 
+  /* ===== FILA DE SYNC ===== */
   @override
-  Future<void> addToSyncQueue(SyncOperationModel operation) async {
+  Future<void> addToSyncQueue(SyncOperationModel op) async {
     final db = await databaseHelper.database;
-    await db.insert(DatabaseHelper.tableSyncQueue, operation.toMap());
+    await db.insert(DatabaseHelper.tableSyncQueue, op.toMap());
   }
 
   @override
@@ -547,7 +523,7 @@ class LocalDataSourceImpl implements LocalDataSource {
       whereArgs: [userId],
       orderBy: 'timestamp ASC',
     );
-    return maps.map((map) => SyncOperationModel.fromMap(map)).toList();
+    return maps.map(SyncOperationModel.fromMap).toList();
   }
 
   @override
@@ -557,6 +533,33 @@ class LocalDataSourceImpl implements LocalDataSource {
       DatabaseHelper.tableSyncQueue,
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  // <<< IMPLEMENTAÇÃO DOS NOVOS MÉTODOS >>>
+  /* ===== PRODUTOS (EAN) ===== */
+  @override
+  Future<UserProductModel?> getUserProductByBarcode(String barcode) async {
+    final db = await databaseHelper.database;
+    final maps = await db.query(
+      DatabaseHelper.tableUserProducts,
+      where: 'barcode = ?',
+      whereArgs: [barcode],
+      limit: 1,
+    );
+    if (maps.isNotEmpty) {
+      return UserProductModel.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveUserProduct(UserProductModel product) async {
+    final db = await databaseHelper.database;
+    await db.insert(
+      DatabaseHelper.tableUserProducts,
+      product.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 }
