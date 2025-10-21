@@ -1,16 +1,18 @@
 // lib/presentation/views/splash/splash_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/auth/auth_wrapper.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeInAnimation;
@@ -66,6 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final packageInfoAsync = ref.watch(packageInfoProvider);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final size = MediaQuery.of(context).size;
@@ -76,24 +79,34 @@ class _SplashScreenState extends State<SplashScreen>
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        scheme.primary.withOpacity(0.7),
-        Colors.black.withOpacity(0.8),
+        scheme.primary.withAlpha((255 * 0.7).toInt()),
+        Colors.black.withAlpha((255 * 0.8).toInt()),
       ],
     )
         : LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        scheme.surface.withOpacity(0.60),
-        scheme.primaryContainer.withOpacity(0.70),
+        scheme.surface.withAlpha((255 * 0.60).toInt()),
+        scheme.primaryContainer.withAlpha((255 * 0.70).toInt()),
       ],
     );
 
     final Color sloganColor = isDark ? Colors.white.withOpacity(0.9) : scheme.onSurfaceVariant;
-
     final Color shadowColor = isDark ? Colors.black.withOpacity(0.5) : Colors.black.withOpacity(0.2);
-
     final Color progressBackgroundColor = isDark ? Colors.white.withOpacity(0.2) : scheme.primary.withOpacity(0.2);
+
+    final footerTextStyle = TextStyle(
+      fontSize: 12,
+      color: sloganColor,
+      shadows: [
+        Shadow(
+          color: shadowColor.withOpacity(0.7),
+          offset: const Offset(0, 1),
+          blurRadius: 2,
+        ),
+      ],
+    );
 
     return Scaffold(
       body: Container(
@@ -126,16 +139,12 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // <<< MUDANÇA: Tamanho da logo aumentado >>>
                           SizedBox(
-                            width: size.width * 0.7, // Aumentado para 70%
-                            height: size.width * 0.7, // Aumentado para 70%
+                            width: size.width * 0.7,
+                            height: size.width * 0.7,
                             child: Image.asset('assets/images/logo.png'),
                           ),
-                          // <<< MUDANÇA: Título "Superlistas" REMOVIDO >>>
-
-                          SizedBox(height: size.height * 0.02), // Espaço ajustado
-
+                          SizedBox(height: size.height * 0.02),
                           Text(
                             'Suas compras, simplificadas',
                             style: theme.textTheme.bodyLarge?.copyWith(
@@ -169,19 +178,24 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 Padding(
                   padding: EdgeInsets.only(bottom: size.height * 0.03),
-                  child: Text(
-                    '© 2025 Superlistas',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: sloganColor,
-                      shadows: [
-                        Shadow(
-                          color: shadowColor.withOpacity(0.7),
-                          offset: const Offset(0, 1),
-                          blurRadius: 2,
+                  child: Column(
+                    children: [
+                      // <<< FORMATO DA VERSÃO CORRIGIDO >>>
+                      packageInfoAsync.when(
+                        data: (info) => Text(
+                          // Usa o novo formato
+                          'Versão ${info.version} (Build ${info.buildNumber})',
+                          style: footerTextStyle,
                         ),
-                      ],
-                    ),
+                        loading: () => Text('Carregando versão...', style: footerTextStyle),
+                        error: (e, s) => Text('Versão indisponível', style: footerTextStyle),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '© 2025 Superlistas',
+                        style: footerTextStyle,
+                      ),
+                    ],
                   ),
                 ),
               ],

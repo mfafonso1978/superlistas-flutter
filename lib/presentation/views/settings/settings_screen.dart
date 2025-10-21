@@ -1,5 +1,7 @@
 // lib/presentation/views/settings/settings_screen.dart
+import 'dart:convert'; // <<< IMPORT ADICIONADO >>>
 import 'dart:io';
+import 'dart:typed_data'; // <<< IMPORT ADICIONADO >>>
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_selector/file_selector.dart';
@@ -13,13 +15,17 @@ import 'package:superlistas/presentation/providers/providers.dart';
 import 'package:superlistas/presentation/views/premium/premium_screen.dart';
 import 'package:superlistas/presentation/views/settings/background_selection_screen.dart';
 import 'package:superlistas/presentation/views/units/units_screen.dart';
+import 'package:superlistas/presentation/views/settings/about_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+// Função _showPremiumUpsell (sem alteração)
 void _showPremiumUpsell(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => const PremiumScreen()),
   );
 }
 
+// Classe SettingsScreen (sem alteração)
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -42,11 +48,12 @@ class SettingsScreen extends ConsumerWidget {
       appBar: const GlassAppBar(title: Text('Configurações')),
       body: Stack(
         children: [
-          AppBackground(),
+          const AppBackground(),
           SafeArea(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Card Aparência
                 if (themeToggleEnabled || backgroundSelectEnabled) ...[
                   GlassCard(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -79,6 +86,7 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                 ],
 
+                // Card Conta
                 GlassCard(
                   child: Column(
                     children: [
@@ -102,6 +110,7 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
 
+                // Card Dados
                 if (unitsScreenEnabled || importExportEnabled) ...[
                   GlassCard(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -136,25 +145,42 @@ class SettingsScreen extends ConsumerWidget {
                       ],
                     ]),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                 ],
+
+                // Card Sincronização e Apagar Dados
                 GlassCard(
                   child: Column(
                     children: [
                       ListTile(
-                        leading: Icon(Icons.cloud_upload_rounded, color: scheme.secondary),
-                        title: const Text('Sincronização Inicial'),
-                        subtitle: const Text('Envie seus dados locais para a nuvem'),
+                        leading: Icon(Icons.cloud_sync_rounded, color: scheme.secondary),
+                        title: const Text('Sincronização com a Nuvem'),
+                        subtitle: const Text('Envie seus dados locais para a nuvem (sobrescreve)'),
                         onTap: () => _sincronizacaoInicial(context, ref),
                       ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
-                        leading: Icon(Icons.delete_forever, color: scheme.error),
-                        title: Text('Apagar Todos os Dados', style: TextStyle(color: scheme.error)),
-                        subtitle: const Text('Remove todas as listas e itens permanentemente.'),
+                        leading: Icon(Icons.delete_sweep_rounded, color: scheme.error),
+                        title: Text('Apagar Todos os Dados Locais', style: TextStyle(color: scheme.error)),
+                        subtitle: const Text('Remove listas e itens do dispositivo'),
                         onTap: () => _apagarTodosOsDados(context, ref),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Card "Sobre"
+                GlassCard(
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline_rounded, color: scheme.secondary),
+                    title: const Text('Sobre o Aplicativo'),
+                    subtitle: const Text('Versão, documentação e políticas'),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -164,25 +190,33 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
-}
+} // Fim da classe SettingsScreen
+
+// --- Funções Helper ---
 
 Future<void> _resetPassword(BuildContext context, WidgetRef ref) async {
   final user = ref.read(authViewModelProvider);
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` check) >>>
+  // Guarda o ScaffoldMessenger ANTES do await
+  final messenger = ScaffoldMessenger.of(context);
+
   if (user == null || user.email.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       const SnackBar(backgroundColor: Colors.red, content: Text('Usuário não encontrado ou sem e-mail cadastrado.')),
     );
     return;
   }
 
-  final messenger = ScaffoldMessenger.of(context);
-
   try {
     await ref.read(authViewModelProvider.notifier).sendPasswordResetEmail(user.email);
+    // Verifica se o widget ainda está montado ANTES de usar o messenger
+    if (!context.mounted) return;
     messenger.showSnackBar(
       const SnackBar(content: Text('Link de recuperação enviado! Verifique seu e-mail (e a caixa de spam).')),
     );
   } catch (e) {
+    // Verifica se o widget ainda está montado ANTES de usar o messenger
+    if (!context.mounted) return;
     messenger.showSnackBar(
       SnackBar(backgroundColor: Colors.red, content: Text('Erro: ${e.toString()}')),
     );
@@ -191,9 +225,13 @@ Future<void> _resetPassword(BuildContext context, WidgetRef ref) async {
 
 Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPasswordUser) async {
   final scheme = Theme.of(context).colorScheme;
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` checks) >>>
+  // Guarda o ScaffoldMessenger e Navigator ANTES dos awaits
   final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context); // Usado para fechar diálogos
 
   if (!isPasswordUser) {
+    // Não há await aqui, então o uso do context é seguro
     await showGlassDialog(
       context: context,
       title: const Text('Excluir Conta Google'),
@@ -206,6 +244,7 @@ Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPassword
   }
 
   final passwordController = TextEditingController();
+  // Usa o context original para mostrar o diálogo
   final bool? confirm = await showGlassDialog<bool>(
     context: context,
     title: const Text('Excluir Conta'),
@@ -221,6 +260,7 @@ Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPassword
           autofocus: true,
           decoration: const InputDecoration(labelText: 'Senha'),
           onSubmitted: (_) {
+            // Usa o navigator original (do context do diálogo) para fechar este diálogo específico
             if (passwordController.text.isNotEmpty) {
               Navigator.of(context, rootNavigator: true).pop(true);
             }
@@ -233,6 +273,7 @@ Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPassword
       ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
         onPressed: () {
+          // Usa o navigator original (do context do diálogo) para fechar este diálogo específico
           if (passwordController.text.isNotEmpty) {
             Navigator.of(context, rootNavigator: true).pop(true);
           }
@@ -242,9 +283,13 @@ Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPassword
     ],
   );
 
-  if (confirm != true || passwordController.text.isEmpty) return;
-  if (!context.mounted) return;
+  // Verifica montagem APÓS o primeiro await (showGlassDialog)
+  if (!context.mounted || confirm != true || passwordController.text.isEmpty) {
+    passwordController.dispose();
+    return;
+  }
 
+  // Mostra diálogo de loading usando o context original (que ainda está montado)
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -253,27 +298,40 @@ Future<void> _deleteAccount(BuildContext context, WidgetRef ref, bool isPassword
 
   try {
     await ref.read(authViewModelProvider.notifier).reauthenticateAndDeleteAccount(passwordController.text);
-    if(context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Sua conta foi excluída com sucesso.')),
-      );
-    }
+
+    // Verifica montagem APÓS o await da exclusão
+    if (!navigator.canPop()) return; // Se não pode fechar o loading, algo deu errado
+    navigator.pop(); // Fecha loading usando o navigator guardado
+
+    // O messenger aqui também usa o context original, que foi verificado
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Sua conta foi excluída com sucesso.')),
+    );
+    // Não precisa de mais checks de mounted aqui, pois o AuthWrapper cuidará da navegação
+
   } catch (e) {
-    if(context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(
-        SnackBar(backgroundColor: Colors.red, content: Text(e.toString())),
-      );
-    }
+    // Verifica montagem APÓS o await da exclusão (em caso de erro)
+    if (!navigator.canPop()) return;
+    navigator.pop(); // Fecha loading usando o navigator guardado
+
+    // O messenger aqui também usa o context original, que foi verificado
+    messenger.showSnackBar(
+      SnackBar(backgroundColor: Colors.red, content: Text(e.toString())),
+    );
+  } finally {
+    passwordController.dispose();
   }
 }
 
+
 Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   final scheme = Theme.of(context).colorScheme;
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` checks) >>>
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context); // Usa rootNavigator para fechar diálogos sobrepostos
 
   final bool? confirm = await showGlassDialog<bool>(
-    context: context,
+    context: context, // Usa context original
     maxHeightFraction: 0.55,
     title: Row(children: [
       Icon(Icons.warning_amber_rounded, color: scheme.error),
@@ -290,18 +348,20 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
       Text('Os dados não poderão ser recuperados.'),
     ]),
     actions: [
-      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')), // Fecha só o diálogo glass
       ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
-        onPressed: () => Navigator.of(context).pop(true),
+        onPressed: () => Navigator.of(context).pop(true), // Fecha só o diálogo glass
         child: const Text('Sim, Apagar Tudo'),
       ),
     ],
   );
 
-  if (confirm != true) return;
-  if (!context.mounted) return;
+  // Verifica montagem APÓS o await do showGlassDialog
+  if (!context.mounted || confirm != true) return;
 
+
+  // Mostra diálogo de loading usando o context original
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -312,7 +372,7 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             CircularProgressIndicator(),
             SizedBox(width: 20),
-            Text("Processando..."),
+            Text("Apagando dados..."),
           ]),
         ),
       ),
@@ -320,42 +380,65 @@ Future<void> _apagarTodosOsDados(BuildContext context, WidgetRef ref) async {
   );
 
   try {
-    await ref.read(settingsViewModelProvider.notifier).deleteAllUserData();
+    final user = ref.read(authViewModelProvider);
+    if (user != null) {
+      await ref.read(shoppingListRepositoryProvider).deleteAllUserData(user.id);
+    } else {
+      throw Exception("Usuário não encontrado para apagar os dados.");
+    }
 
+    // Verifica montagem APÓS o await do deleteAllUserData
     if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Todos os dados foram apagados com sucesso.')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(const SnackBar(content: Text('Todos os dados foram apagados com sucesso.')));
 
-    final currentUser = ref.read(authViewModelProvider);
-    if (currentUser != null) {
-      ref.invalidate(shoppingListsStreamProvider(currentUser.id));
-      ref.invalidate(historyViewModelProvider(currentUser.id));
-      ref.invalidate(dashboardViewModelProvider(currentUser.id));
-      ref.invalidate(statsViewModelProvider(currentUser.id));
+    // Invalida e refresha providers (sem usar context aqui)
+    if (user != null) {
+      ref.invalidate(shoppingListsStreamProvider(user.id));
+      ref.invalidate(historyViewModelProvider(user.id));
+      ref.invalidate(dashboardViewModelProvider(user.id));
+      ref.invalidate(statsViewModelProvider(user.id));
+      ref.refresh(shoppingListsViewModelProvider(user.id));
+      ref.refresh(historyViewModelProvider(user.id));
+      ref.refresh(dashboardViewModelProvider(user.id));
+      ref.refresh(statsViewModelProvider(user.id));
     }
 
   } catch (e) {
+    // Verifica montagem APÓS o await (em caso de erro)
     if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ocorreu um erro: $e')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(SnackBar(content: Text('Ocorreu um erro ao apagar os dados: $e'), backgroundColor: Colors.red,));
   }
 }
 
+
 Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
-  if (!context.mounted) return;
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` checks) >>>
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context); // Usa rootNavigator
+
   final bool? confirm = await showGlassDialog<bool>(
-    context: context,
-    title: const Text('Confirmar Sincronização'),
-    content: const Text('Isso enviará todos os seus dados locais para a nuvem. Esta ação sobrescreverá quaisquer dados existentes na nuvem. Continuar?'),
+    context: context, // Usa context original
+    title: const Text('Confirmar Sincronização Inicial'),
+    content: const Text('Isso enviará todos os seus dados locais para a nuvem. Esta ação sobrescreverá quaisquer dados existentes na nuvem para este usuário. Continuar?'),
     actions: [
-      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-      ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sim, Sincronizar')),
+      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')), // Fecha só o glass
+      ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sim, Sincronizar')), // Fecha só o glass
     ],
   );
 
-  if (confirm != true) return;
-  if (!context.mounted) return;
+  // Verifica montagem APÓS o await do showGlassDialog
+  if (!context.mounted || confirm != true) return;
 
+
+  // Mostra diálogo de loading usando o context original
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -374,47 +457,128 @@ Future<void> _sincronizacaoInicial(BuildContext context, WidgetRef ref) async {
   );
 
   try {
-    await ref.read(settingsViewModelProvider.notifier).performInitialCloudSync();
+    final user = ref.read(authViewModelProvider);
+    if (user != null) {
+      await ref.read(shoppingListRepositoryProvider).performInitialCloudSync(user.id);
+    } else {
+      throw Exception("Usuário não encontrado para sincronizar.");
+    }
 
+    // Verifica montagem APÓS o await do sync
     if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sincronização concluída com sucesso!')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(const SnackBar(content: Text('Sincronização inicial concluída com sucesso!')));
   } catch (e) {
+    // Verifica montagem APÓS o await (em caso de erro)
     if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha na sincronização: $e')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(SnackBar(content: Text('Falha na sincronização inicial: $e'), backgroundColor: Colors.red,));
   }
 }
 
 
 Future<void> _exportarDados(BuildContext context, WidgetRef ref) async {
   final currentUser = ref.read(authViewModelProvider);
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` checks) >>>
   final messenger = ScaffoldMessenger.of(context);
+  // Não precisamos guardar o navigator aqui ainda
+
   if (currentUser == null) {
     messenger.showSnackBar(const SnackBar(content: Text('Você precisa estar logado para exportar.')));
     return;
   }
   try {
+    // Mostra indicador de progresso ANTES do await
+    showDialog(
+      context: context, // Usa context original
+      barrierDismissible: false,
+      builder: (dialogContext) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text("Exportando dados..."),
+            ]),
+          ),
+        ),
+      ),
+    );
+
     final jsonString = await ref.read(shoppingListRepositoryProvider).exportDataToJson(currentUser.id);
 
+    // Verifica montagem APÓS o await da exportação
     if (!context.mounted) return;
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    // Continua com a lógica de salvar/compartilhar
     final now = DateTime.now();
     final backupName = 'superlistas_backup_${DateFormat('yyyyMMdd_HHmmss').format(now)}.json';
-    final tempDir = await getTemporaryDirectory();
-    final filePath = '${tempDir.path}/$backupName';
-    final file = File(filePath);
-    await file.writeAsString(jsonString);
-    final xfile = XFile(filePath, name: backupName, mimeType: 'application/json');
-    await Share.shareXFiles([xfile], subject: 'Backup Superlistas', text: 'Anexo está o seu backup de dados do Superlistas de $now.');
+
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      final FileSaveLocation? result = await getSaveLocation(suggestedName: backupName);
+      // Verifica montagem APÓS o await do getSaveLocation
+      if (!context.mounted || result == null) return;
+
+      final Uint8List fileData = utf8.encode(jsonString);
+      final xFile = XFile.fromData(fileData, name: backupName, mimeType: 'application/json');
+      await xFile.saveTo(result.path); // saveTo pode levar um tempo
+
+      // Verifica montagem APÓS o await do saveTo
+      if (!context.mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Backup salvo em: ${result.path}')));
+
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      final tempDir = await getTemporaryDirectory();
+      // Verifica montagem APÓS o await do getTemporaryDirectory
+      if (!context.mounted) return;
+
+      final filePath = '${tempDir.path}/$backupName';
+      final file = File(filePath);
+      await file.writeAsString(jsonString); // Escrever pode levar um tempo
+
+      // Verifica montagem APÓS o await do writeAsString
+      if (!context.mounted) return;
+
+      final xfile = XFile(filePath, name: backupName, mimeType: 'application/json');
+      final shareResult = await Share.shareXFiles([xfile], subject: 'Backup Superlistas', text: 'Anexo está o seu backup de dados do Superlistas de $now.');
+
+      // Limpa o arquivo temporário
+      // Não precisa verificar mounted aqui pois delete é rápido
+      if (shareResult.status == ShareResultStatus.success || shareResult.status == ShareResultStatus.dismissed) {
+        await file.delete();
+      }
+    } else {
+      messenger.showSnackBar(const SnackBar(content: Text('Exportação não suportada nesta plataforma.')));
+    }
+
   } catch (e) {
+    // Verifica montagem APÓS o await (em caso de erro)
     if (!context.mounted) return;
-    messenger.showSnackBar(SnackBar(content: Text('Falha ao exportar: $e')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(SnackBar(content: Text('Falha ao exportar: $e'), backgroundColor: Colors.red));
   }
 }
 
 Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
   final currentUser = ref.read(authViewModelProvider);
+  // <<< CORREÇÃO DE LINT APLICADA AQUI (`context.mounted` checks) >>>
   final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context); // Usa rootNavigator
+
   if (currentUser == null) {
     messenger.showSnackBar(const SnackBar(content: Text('Você precisa estar logado para importar.')));
     return;
@@ -422,18 +586,19 @@ Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
   try {
     const group = XTypeGroup(label: 'JSON', extensions: ['json']);
     final XFile? selected = await openFile(acceptedTypeGroups: const [group]);
-    if (selected == null) return;
 
-    if (!context.mounted) return;
+    // Verifica montagem APÓS o await do openFile
+    if (!context.mounted || selected == null) return;
+
     final bool? confirm = await showGlassDialog<bool>(
-      context: context,
+      context: context, // Usa context original
       title: const Text('Atenção!'),
       content: const Text('Importar um arquivo substituirá TODAS as suas listas e itens atuais. Esta ação não pode ser desfeita. Deseja continuar?'),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')), // Fecha só o glass
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: () => Navigator.of(context).pop(true),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          onPressed: () => Navigator.of(context).pop(true), // Fecha só o glass
           child: const Flexible(
             child: Text(
               'Sim, substituir',
@@ -443,18 +608,60 @@ Future<void> _importarDados(BuildContext context, WidgetRef ref) async {
         ),
       ],
     );
-    if (confirm != true) return;
-    final content = await selected.readAsString();
-    await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content);
 
+    // Verifica montagem APÓS o await do showGlassDialog
+    if (!context.mounted || confirm != true) return;
+
+    // Mostra indicador de progresso usando context original
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text("Importando dados..."),
+            ]),
+          ),
+        ),
+      ),
+    );
+
+    final content = await selected.readAsString(); // Leitura pode demorar
+    // Verifica montagem APÓS o await da leitura do arquivo
     if (!context.mounted) return;
+
+    await ref.read(shoppingListRepositoryProvider).importDataFromJson(currentUser.id, content); // Importação pode demorar
+
+    // Verifica montagem APÓS o await da importação
+    if (!context.mounted) return;
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    // Invalida e refresha providers (sem usar context aqui)
     ref.invalidate(shoppingListsStreamProvider(currentUser.id));
     ref.invalidate(historyViewModelProvider(currentUser.id));
     ref.invalidate(dashboardViewModelProvider(currentUser.id));
     ref.invalidate(statsViewModelProvider(currentUser.id));
+    ref.refresh(shoppingListsViewModelProvider(currentUser.id));
+    ref.refresh(historyViewModelProvider(currentUser.id));
+    ref.refresh(dashboardViewModelProvider(currentUser.id));
+    ref.refresh(statsViewModelProvider(currentUser.id));
+
     messenger.showSnackBar(SnackBar(content: Text('Dados importados com sucesso de ${selected.name}')));
+
   } catch (e) {
+    // Verifica montagem APÓS o await (em caso de erro)
     if (!context.mounted) return;
-    messenger.showSnackBar(SnackBar(content: Text('Falha ao importar: $e')));
+    // Tenta fechar o diálogo de loading
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    messenger.showSnackBar(SnackBar(content: Text('Falha ao importar: $e'), backgroundColor: Colors.red));
   }
 }

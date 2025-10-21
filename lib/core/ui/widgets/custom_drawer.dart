@@ -37,6 +37,8 @@ class CustomDrawer extends ConsumerWidget {
     final settingsEnabled = remoteConfig.isSettingsScreenEnabled;
     final themeToggleEnabled = remoteConfig.isThemeToggleEnabled;
 
+    final packageInfoAsync = ref.watch(packageInfoProvider);
+
     return Drawer(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -61,9 +63,9 @@ class CustomDrawer extends ConsumerWidget {
                 ),
               ),
             ),
-            child: Column(
+            child: Column( // Column principal
               children: [
-                Expanded(
+                Expanded( // Lista de itens rolável
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: <Widget>[
@@ -101,7 +103,7 @@ class CustomDrawer extends ConsumerWidget {
                           text: 'Estatísticas',
                           isSelected: currentIndex == 3,
                           onTap: () {
-                            Navigator.pop(context);
+                            Navigator.pop(context); // Fecha drawer ANTES de navegar
                             if (isPremium) {
                               _onItemTapped(context, ref, 3);
                             } else {
@@ -131,7 +133,7 @@ class CustomDrawer extends ConsumerWidget {
                         ),
 
                       const Divider(
-                          color: Colors.white24,
+                          color: Colors.white24, // Usar cor do tema pode ser melhor
                           height: 16),
                       _buildDrawerItem(
                         context,
@@ -167,6 +169,8 @@ class CustomDrawer extends ConsumerWidget {
 
                           // Só fecha o drawer e faz logout se o usuário confirmar
                           if (confirm == true) {
+                            // Verifica se o widget ainda está montado ANTES de interagir
+                            if (!context.mounted) return;
                             Navigator.pop(context); // Fecha o drawer
                             ref.read(authViewModelProvider.notifier).signOut();
                           }
@@ -175,7 +179,31 @@ class CustomDrawer extends ConsumerWidget {
                     ],
                   ),
                 ),
+
+                // <<< SEÇÃO DO RODAPÉ REORDENADA E CORRIGIDA >>>
+                // 1. Toggle do Tema (se habilitado)
                 if (themeToggleEnabled) _ThemeToggle(isDark: isDark),
+
+                // 2. Informação da Versão (sempre visível, abaixo do toggle)
+                SafeArea(
+                  top: false, // Só aplica padding na parte de baixo
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0, top: 4.0), // Ajuste no padding
+                    child: packageInfoAsync.when(
+                      data: (info) => Text(
+                        // <<< FORMATO CORRIGIDO >>>
+                        'Superlistas Versão ${info.version} (Build ${info.buildNumber})',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                      ),
+                      loading: () => const SizedBox(height: 18), // Placeholder de altura
+                      error: (e, s) => const SizedBox(height: 18), // Placeholder de altura
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -185,11 +213,13 @@ class CustomDrawer extends ConsumerWidget {
   }
 
   void _onItemTapped(BuildContext context, WidgetRef ref, int index) {
+    Navigator.pop(context); // Fecha o drawer ao selecionar um item principal
     ref.read(mainScreenIndexProvider.notifier).state = index;
   }
 
   void _navigateTo(BuildContext context, Widget page) {
-    Navigator.pop(context);
+    Navigator.pop(context); // Fecha o drawer
+    // Usa push para adicionar a nova tela sobre a MainScreen
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => page),
@@ -205,21 +235,23 @@ class CustomDrawer extends ConsumerWidget {
       }) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const selectedColor = Color(0xFF1565C0);
+    const selectedColor = Color(0xFF1565C0); // Azul como cor de seleção
 
     return ListTile(
       leading: Icon(
           icon,
+          // Cor baseada na seleção ou no tema
           color: isSelected
               ? selectedColor
               : (isDark ? scheme.onSurfaceVariant : scheme.onSurface.withAlpha((255 * 0.8).toInt()))
       ),
       selected: isSelected,
-      selectedTileColor: selectedColor.withAlpha((255 * 0.15).toInt()),
+      selectedTileColor: selectedColor.withAlpha((255 * 0.15).toInt()), // Fundo sutil ao selecionar
       title: Text(
         text,
         style: GoogleFonts.poppins(
           fontSize: 16,
+          // Cor do texto baseada na seleção ou no tema
           color: isSelected
               ? selectedColor
               : (isDark ? scheme.onSurface : scheme.onSurface.withAlpha((255 * 0.9).toInt())),
@@ -317,48 +349,46 @@ class _ThemeToggle extends ConsumerWidget {
     final Color iconColor = isDark ? Colors.white : Colors.amber;
     final Color activeSwitchColor = isDark ? Colors.white : Colors.amber;
 
-    return SafeArea(
-      top: false,
-      child: SwitchListTile(
-        title: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            color: isDark ? scheme.onSurface : scheme.onSurface.withAlpha((255 * 0.9).toInt()),
-            fontWeight: FontWeight.w500,
-          ),
+    // Remove o SafeArea daqui, pois já está sendo aplicado no pai
+    return SwitchListTile(
+      title: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          color: isDark ? scheme.onSurface : scheme.onSurface.withAlpha((255 * 0.9).toInt()),
+          fontWeight: FontWeight.w500,
         ),
-        secondary: Icon(
-          isDark ? Icons.nightlight_round : Icons.wb_sunny_rounded,
-          color: iconColor,
-        ),
-        value: themeMode == ThemeMode.dark,
-        onChanged: (isDarkValue) {
-          final newMode = isDarkValue ? ThemeMode.dark : ThemeMode.light;
-          ref.read(themeModeProvider.notifier).setMode(newMode);
-        },
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return activeSwitchColor;
-          }
-          return isDark
-              ? Colors.grey[300]
-              : Colors.grey[600];
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return activeSwitchColor.withAlpha((255 * 0.3).toInt());
-          }
-          return isDark
-              ? Colors.grey[700]
-              : Colors.grey[300];
-        }),
-        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-          return isDark
-              ? Colors.grey[600]
-              : Colors.grey[400];
-        }),
       ),
+      secondary: Icon(
+        isDark ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+        color: iconColor,
+      ),
+      value: themeMode == ThemeMode.dark,
+      onChanged: (isDarkValue) {
+        final newMode = isDarkValue ? ThemeMode.dark : ThemeMode.light;
+        ref.read(themeModeProvider.notifier).setMode(newMode);
+      },
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return activeSwitchColor;
+        }
+        return isDark
+            ? Colors.grey[300]
+            : Colors.grey[600];
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return activeSwitchColor.withAlpha((255 * 0.3).toInt());
+        }
+        return isDark
+            ? Colors.grey[700]
+            : Colors.grey[300];
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        return isDark
+            ? Colors.grey[600]
+            : Colors.grey[400];
+      }),
     );
   }
 }
